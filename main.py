@@ -923,6 +923,29 @@ async def get_root():
 </body>
 </html>"""
 
+@app.get("/debug/polygon-test/{symbol}")
+async def debug_polygon_test(symbol: str):
+    """Test Polygon.io API directly with detailed response"""
+    if POLYGON_API_KEY == "demo_key":
+        return {"error": "No Polygon API key configured"}
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            # Test the previous close endpoint (most reliable)
+            url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={POLYGON_API_KEY}"
+            response = await client.get(url)
+            
+            return {
+                "symbol": symbol,
+                "url": url.replace(POLYGON_API_KEY, "***API_KEY***"),
+                "status_code": response.status_code,
+                "headers": dict(response.headers),
+                "response": response.json() if response.status_code == 200 else response.text,
+                "api_key_length": len(POLYGON_API_KEY) if POLYGON_API_KEY else 0
+            }
+    except Exception as e:
+        return {"error": str(e), "symbol": symbol}
+
 @app.get("/debug/api-status")
 async def debug_api_status():
     """Debug endpoint to check API key configuration and connectivity"""
