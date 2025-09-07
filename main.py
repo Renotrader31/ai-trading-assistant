@@ -1044,8 +1044,9 @@ async def websocket_endpoint(websocket: WebSocket):
             if user_message:
                 # Extract potential stock symbol
                 import re
-                symbol_match = re.search(r'\\b([A-Z]{1,5})\\b', user_message.upper())
+                symbol_match = re.search(r'\b([A-Z]{2,5})\b', user_message.upper())
                 symbol = symbol_match.group(1) if symbol_match else None
+                print(f"DEBUG: User message: '{user_message}', extracted symbol: '{symbol}'")
                 
                 # Get market data if symbol found
                 market_data = {}
