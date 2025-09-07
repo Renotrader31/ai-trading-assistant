@@ -817,6 +817,83 @@ async def get_root():
 </body>
 </html>"""
 
+@app.get("/debug/api-status")
+async def debug_api_status():
+    """Debug endpoint to check API key configuration and connectivity"""
+    try:
+        # Check environment variables
+        anthropic_key_status = "CONFIGURED" if ANTHROPIC_API_KEY != "demo_key" else "MISSING"
+        polygon_key_status = "CONFIGURED" if POLYGON_API_KEY != "demo_key" else "MISSING"
+        
+        # Test Anthropic API connectivity
+        anthropic_test = "UNTESTED"
+        if ANTHROPIC_API_KEY != "demo_key":
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": ANTHROPIC_API_KEY,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json"
+                        },
+                        json={
+                            "model": "claude-3-5-haiku-20241022",
+                            "max_tokens": 10,
+                            "messages": [{"role": "user", "content": "test"}]
+                        }
+                    )
+                    if response.status_code == 200:
+                        anthropic_test = "✅ CONNECTED"
+                    elif response.status_code == 401:
+                        anthropic_test = "❌ INVALID_KEY"
+                    elif response.status_code == 404:
+                        anthropic_test = "❌ MODEL_NOT_FOUND"
+                    else:
+                        anthropic_test = f"❌ ERROR_{response.status_code}"
+            except Exception as e:
+                anthropic_test = f"❌ CONNECTION_ERROR: {str(e)}"
+        
+        # Test Polygon API connectivity
+        polygon_test = "UNTESTED"
+        if POLYGON_API_KEY != "demo_key":
+            try:
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    response = await client.get(
+                        f"https://api.polygon.io/v2/aggs/ticker/AAPL/prev?adjusted=true&apikey={POLYGON_API_KEY}"
+                    )
+                    if response.status_code == 200:
+                        polygon_test = "✅ CONNECTED"
+                    elif response.status_code == 401:
+                        polygon_test = "❌ INVALID_KEY"
+                    else:
+                        polygon_test = f"❌ ERROR_{response.status_code}"
+            except Exception as e:
+                polygon_test = f"❌ CONNECTION_ERROR: {str(e)}"
+        
+        return {
+            "timestamp": datetime.now().isoformat(),
+            "api_keys": {
+                "anthropic": {
+                    "status": anthropic_key_status,
+                    "key_prefix": f"{ANTHROPIC_API_KEY[:12]}..." if ANTHROPIC_API_KEY != "demo_key" else "demo_key",
+                    "connectivity": anthropic_test
+                },
+                "polygon": {
+                    "status": polygon_key_status,
+                    "key_prefix": f"{POLYGON_API_KEY[:8]}..." if POLYGON_API_KEY != "demo_key" else "demo_key",
+                    "connectivity": polygon_test
+                }
+            },
+            "environment": {
+                "anthropic_env": "SET" if os.getenv("ANTHROPIC_API_KEY") else "MISSING",
+                "polygon_env": "SET" if os.getenv("POLYGON_API_KEY") else "MISSING"
+            }
+        }
+        
+    except Exception as e:
+        return {"error": f"Debug endpoint error: {str(e)}"}
+
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
@@ -827,18 +904,27 @@ async def websocket_endpoint(websocket: WebSocket):
             user_message = message_data.get("message", "")
             
             if user_message:
+                # Debug logging
+                print(f"DEBUG: Received message: {user_message}")
+                print(f"DEBUG: ANTHROPIC_API_KEY status: {'SET' if ANTHROPIC_API_KEY != 'demo_key' else 'DEMO'}")
+                print(f"DEBUG: POLYGON_API_KEY status: {'SET' if POLYGON_API_KEY != 'demo_key' else 'DEMO'}")
+                
                 # Extract potential stock symbol
                 import re
                 symbol_match = re.search(r'\\b([A-Z]{1,5})\\b', user_message.upper())
                 symbol = symbol_match.group(1) if symbol_match else None
+                print(f"DEBUG: Extracted symbol: {symbol}")
                 
                 # Get market data if symbol found
                 market_data = {}
                 if symbol:
                     market_data = await get_market_data(symbol)
+                    print(f"DEBUG: Market data type: {type(market_data)}")
                 
                 # Get AI analysis
+                print(f"DEBUG: Calling get_ai_analysis...")
                 ai_response = await get_ai_analysis(user_message, market_data)
+                print(f"DEBUG: AI response length: {len(ai_response) if ai_response else 0}")
                 
                 # Send response back
                 await manager.send_personal_message(
