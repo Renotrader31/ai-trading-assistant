@@ -53,79 +53,114 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
         }
     
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            print(f"DEBUG: Fetching data for {symbol} with Polygon API")
+            
+            # Get previous close (most reliable endpoint)
+            prev_close_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={POLYGON_API_KEY}"
+            print(f"DEBUG: Calling {prev_close_url}")
+            prev_close_response = await client.get(prev_close_url)
+            print(f"DEBUG: Previous close response: {prev_close_response.status_code}")
+            
             # Get ticker details
             details_url = f"https://api.polygon.io/v3/reference/tickers/{symbol}?apikey={POLYGON_API_KEY}"
+            print(f"DEBUG: Calling {details_url}")
             details_response = await client.get(details_url)
-            
-            # Get previous close
-            prev_close_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={POLYGON_API_KEY}"
-            prev_close_response = await client.get(prev_close_url)
-            
-            # Get real-time quote (if available)
-            quote_url = f"https://api.polygon.io/v2/last/trade/{symbol}?apikey={POLYGON_API_KEY}"
-            quote_response = await client.get(quote_url)
+            print(f"DEBUG: Details response: {details_response.status_code}")
             
             # Parse the responses
-            details_data = details_response.json() if details_response.status_code == 200 else {}
-            prev_close_data = prev_close_response.json() if prev_close_response.status_code == 200 else {}
-            quote_data = quote_response.json() if quote_response.status_code == 200 else {}
+            prev_close_data = {}
+            details_data = {}
+            
+            if prev_close_response.status_code == 200:
+                prev_close_data = prev_close_response.json()
+                print(f"DEBUG: Prev close data: {prev_close_data}")
+            else:
+                error_text = prev_close_response.text
+                print(f"DEBUG: Prev close error: {prev_close_response.status_code} - {error_text}")
+            
+            if details_response.status_code == 200:
+                details_data = details_response.json()
+                print(f"DEBUG: Details data keys: {list(details_data.keys()) if details_data else 'None'}")
+            else:
+                error_text = details_response.text
+                print(f"DEBUG: Details error: {details_response.status_code} - {error_text}")
             
             # Extract key information and format it consistently
             current_price = None
             prev_close_price = None
+            volume = None
             
-            # Try to get current price from last trade
-            if quote_data.get('results'):
-                current_price = quote_data['results'].get('p')
-            
-            # Get previous close price
+            # Get previous close price (most reliable data)
             if prev_close_data.get('results') and len(prev_close_data['results']) > 0:
-                prev_close_price = prev_close_data['results'][0].get('c')
-                if not current_price:  # Use prev close as current if no real-time data
-                    current_price = prev_close_price
+                result = prev_close_data['results'][0]
+                prev_close_price = result.get('c')  # close price
+                current_price = prev_close_price    # use as current price
+                volume = result.get('v')           # volume
+                print(f"DEBUG: Extracted price: {current_price}, volume: {volume}")
             
             # Get company details
             company_name = symbol
             market_cap = "N/A"
             if details_data.get('results'):
                 company_name = details_data['results'].get('name', symbol)
-                market_cap = details_data['results'].get('market_cap', "N/A")
+                market_cap_raw = details_data['results'].get('market_cap')
+                if market_cap_raw:
+                    # Format market cap nicely
+                    if market_cap_raw > 1000000000000:  # Trillion
+                        market_cap = f"${market_cap_raw/1000000000000:.1f}T"
+                    elif market_cap_raw > 1000000000:  # Billion
+                        market_cap = f"${market_cap_raw/1000000000:.1f}B"
+                    elif market_cap_raw > 1000000:     # Million
+                        market_cap = f"${market_cap_raw/1000000:.1f}M"
+                    else:
+                        market_cap = f"${market_cap_raw}"
             
-            # Calculate change if we have both prices
-            change = 0
-            change_percent = 0
-            if current_price and prev_close_price:
-                change = current_price - prev_close_price
-                change_percent = (change / prev_close_price) * 100 if prev_close_price > 0 else 0
+            # Check if we have valid data
+            if current_price is None or current_price <= 0:
+                print(f"DEBUG: No valid price data found for {symbol}")
+                return {
+                    "error": f"No price data available for {symbol}",
+                    "symbol": symbol,
+                    "live_data": False,
+                    "debug_info": {
+                        "prev_close_status": prev_close_response.status_code,
+                        "details_status": details_response.status_code,
+                        "prev_close_data": prev_close_data,
+                        "details_data": details_data
+                    }
+                }
             
             # Format market data for AI analysis
             formatted_data = {
                 "live_data": True,
                 "symbol": symbol,
                 "company_name": company_name,
-                "price": current_price or 0,
-                "previous_close": prev_close_price or 0,
-                "change": change,
-                "change_percent": change_percent,
+                "price": current_price,
+                "previous_close": prev_close_price,
+                "change": 0,  # Will be 0 since we're using prev close as current
+                "change_percent": 0,
+                "volume": volume,
                 "market_cap": market_cap,
                 "timestamp": datetime.now().isoformat(),
-                "raw_data": {
-                    "details": details_data,
-                    "previous_close": prev_close_data,
-                    "quote": quote_data
-                }
+                "data_note": "Using previous close as current price (most recent available data)"
             }
             
+            print(f"DEBUG: Formatted data: {formatted_data}")
             return formatted_data
             
     except Exception as e:
+        print(f"DEBUG: Exception in get_market_data for {symbol}: {str(e)}")
         # Return error but with proper structure
         return {
-            "error": str(e),
+            "error": f"API Error: {str(e)}",
             "symbol": symbol,
             "live_data": False,
-            "fallback": True
+            "fallback": True,
+            "price": 0,
+            "previous_close": 0,
+            "change": 0,
+            "change_percent": 0
         }
 
 async def get_ai_analysis(user_message: str, market_data: Dict[str, Any]) -> str:
