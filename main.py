@@ -904,27 +904,18 @@ async def websocket_endpoint(websocket: WebSocket):
             user_message = message_data.get("message", "")
             
             if user_message:
-                # Debug logging
-                print(f"DEBUG: Received message: {user_message}")
-                print(f"DEBUG: ANTHROPIC_API_KEY status: {'SET' if ANTHROPIC_API_KEY != 'demo_key' else 'DEMO'}")
-                print(f"DEBUG: POLYGON_API_KEY status: {'SET' if POLYGON_API_KEY != 'demo_key' else 'DEMO'}")
-                
                 # Extract potential stock symbol
                 import re
                 symbol_match = re.search(r'\\b([A-Z]{1,5})\\b', user_message.upper())
                 symbol = symbol_match.group(1) if symbol_match else None
-                print(f"DEBUG: Extracted symbol: {symbol}")
                 
                 # Get market data if symbol found
                 market_data = {}
                 if symbol:
                     market_data = await get_market_data(symbol)
-                    print(f"DEBUG: Market data type: {type(market_data)}")
                 
                 # Get AI analysis
-                print(f"DEBUG: Calling get_ai_analysis...")
                 ai_response = await get_ai_analysis(user_message, market_data)
-                print(f"DEBUG: AI response length: {len(ai_response) if ai_response else 0}")
                 
                 # Send response back
                 await manager.send_personal_message(
