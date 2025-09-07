@@ -48,6 +48,104 @@ POPULAR_STOCKS = [
     'SHOP', 'SQ', 'ROKU', 'ZM', 'SNOW', 'PLTR', 'COIN', 'RBLX'
 ]
 
+# Load comprehensive stock universe
+STOCK_UNIVERSE = {}
+try:
+    with open('stock_universe.json', 'r') as f:
+        STOCK_UNIVERSE = json.load(f)
+    print(f"Loaded stock universe with {STOCK_UNIVERSE.get('total_stocks', 0)} stocks")
+except Exception as e:
+    print(f"Could not load stock_universe.json: {e}")
+    # Fallback to basic list
+    STOCK_UNIVERSE = {
+        'all_stocks': POPULAR_STOCKS * 2,  # Use existing stocks as fallback
+        'popular_stocks': POPULAR_STOCKS,
+        'total_stocks': len(POPULAR_STOCKS),
+        'sectors': {'AAPL': 'Technology', 'MSFT': 'Technology', 'GOOGL': 'Technology'}
+    }
+
+# Professional Scanner Types
+SCANNER_TYPES = {
+    'TOP_GAINERS': {
+        'name': 'Top Gainers',
+        'description': 'Stocks with highest percentage gains',
+        'icon': '📈',
+        'filter': lambda data: data.get('change_percent', 0) > 2
+    },
+    'TOP_LOSERS': {
+        'name': 'Top Losers', 
+        'description': 'Stocks with highest percentage losses',
+        'icon': '📉',
+        'filter': lambda data: data.get('change_percent', 0) < -2
+    },
+    'HIGH_VOLUME': {
+        'name': 'High Volume',
+        'description': 'Stocks with unusually high trading volume',
+        'icon': '📊',
+        'filter': lambda data: data.get('volume', 0) > 5000000
+    },
+    'BREAKOUT_STOCKS': {
+        'name': 'Breakout Stocks',
+        'description': 'Stocks breaking through resistance levels',
+        'icon': '🚀',
+        'filter': lambda data: data.get('change_percent', 0) > 5
+    },
+    'OVERSOLD_RSI': {
+        'name': 'Oversold (RSI < 30)',
+        'description': 'Potentially oversold stocks with RSI below 30',
+        'icon': '⬇️',
+        'filter': lambda data: data.get('rsi', 50) < 30
+    },
+    'OVERBOUGHT_RSI': {
+        'name': 'Overbought (RSI > 70)',
+        'description': 'Potentially overbought stocks with RSI above 70',
+        'icon': '⬆️',
+        'filter': lambda data: data.get('rsi', 50) > 70
+    },
+    'PENNY_STOCKS': {
+        'name': 'Penny Stocks',
+        'description': 'Stocks trading under $5',
+        'icon': '💰',
+        'filter': lambda data: 0.10 <= data.get('price', 0) < 5
+    },
+    'MOMENTUM_STOCKS': {
+        'name': 'Momentum Stocks',
+        'description': 'Stocks with strong upward momentum',
+        'icon': '⚡',
+        'filter': lambda data: data.get('change_percent', 0) > 3 and data.get('volume', 0) > 2000000
+    },
+    'TECH_STOCKS': {
+        'name': 'Technology Sector',
+        'description': 'Technology sector stocks',
+        'icon': '💻',
+        'filter': lambda data: data.get('sector', '') == 'Technology'
+    },
+    'HEALTHCARE_STOCKS': {
+        'name': 'Healthcare Sector',
+        'description': 'Healthcare sector stocks',
+        'icon': '🏥',
+        'filter': lambda data: data.get('sector', '') == 'Healthcare'
+    },
+    'FINANCIAL_STOCKS': {
+        'name': 'Financial Sector',
+        'description': 'Financial sector stocks',
+        'icon': '🏦',
+        'filter': lambda data: data.get('sector', '') == 'Financial'
+    },
+    'ENERGY_STOCKS': {
+        'name': 'Energy Sector', 
+        'description': 'Energy sector stocks',
+        'icon': '⛽',
+        'filter': lambda data: data.get('sector', '') == 'Energy'
+    },
+    'ALL': {
+        'name': 'All Stocks',
+        'description': 'All available stocks',
+        'icon': '📋',
+        'filter': lambda data: True
+    }
+}
+
 async def get_market_data(symbol: str) -> Dict[str, Any]:
     """Get market data from Polygon.io or return demo data"""
     if POLYGON_API_KEY == "demo_key":
@@ -827,45 +925,112 @@ async def get_root():
                         </div>
                     </div>
 
-                    <!-- Scanner Filters -->
-                    <div class="scanner-filters rounded-xl p-4 mb-4">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                    <!-- Professional Scanner Categories -->
+                    <div class="scanner-categories mb-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+                            <button onclick="setQuickScan('TOP_GAINERS')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-green-600/20 hover:bg-green-600/40 border border-green-500/30 transition-all">
+                                📈 Top Gainers
+                            </button>
+                            <button onclick="setQuickScan('TOP_LOSERS')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-red-600/20 hover:bg-red-600/40 border border-red-500/30 transition-all">
+                                📉 Top Losers
+                            </button>
+                            <button onclick="setQuickScan('HIGH_VOLUME')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-blue-600/20 hover:bg-blue-600/40 border border-blue-500/30 transition-all">
+                                📊 High Volume
+                            </button>
+                            <button onclick="setQuickScan('BREAKOUT_STOCKS')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-purple-600/20 hover:bg-purple-600/40 border border-purple-500/30 transition-all">
+                                🚀 Breakouts
+                            </button>
+                            <button onclick="setQuickScan('OVERSOLD_RSI')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-yellow-600/20 hover:bg-yellow-600/40 border border-yellow-500/30 transition-all">
+                                ⬇️ Oversold RSI
+                            </button>
+                            <button onclick="setQuickScan('OVERBOUGHT_RSI')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-orange-600/20 hover:bg-orange-600/40 border border-orange-500/30 transition-all">
+                                ⬆️ Overbought RSI
+                            </button>
+                            <button onclick="setQuickScan('MOMENTUM_STOCKS')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-indigo-600/20 hover:bg-indigo-600/40 border border-indigo-500/30 transition-all">
+                                ⚡ Momentum
+                            </button>
+                            <button onclick="setQuickScan('PENNY_STOCKS')" class="quick-scan-btn p-2 rounded-lg text-xs font-medium bg-emerald-600/20 hover:bg-emerald-600/40 border border-emerald-500/30 transition-all">
+                                💰 Penny Stocks
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Scanner Filters -->
+                    <div class="scanner-filters glass-effect rounded-xl p-4 mb-4">
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
                             <div>
-                                <label class="text-sm text-gray-400 mb-1 block">Scan Type</label>
-                                <select id="scanType" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
-                                    <option value="ALL">All Stocks</option>
-                                    <option value="TOP_GAINERS">Top Gainers</option>
-                                    <option value="TOP_LOSERS">Top Losers</option>
-                                    <option value="HIGH_VOLUME">High Volume</option>
-                                    <option value="BREAKOUT">Breakouts</option>
+                                <label class="text-sm text-gray-400 mb-1 block">Scanner Type</label>
+                                <select id="scanType" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm border border-gray-600">
+                                    <!-- Will be populated dynamically -->
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 mb-1 block">Sector</label>
+                                <select id="sectorFilter" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm border border-gray-600">
+                                    <option value="ALL">All Sectors</option>
+                                    <option value="Technology">💻 Technology</option>
+                                    <option value="Healthcare">🏥 Healthcare</option>
+                                    <option value="Financial">🏦 Financial</option>
+                                    <option value="Energy">⛽ Energy</option>
+                                    <option value="Consumer Discretionary">🛍️ Consumer Disc.</option>
+                                    <option value="Consumer Staples">🛍️ Consumer Staples</option>
+                                    <option value="Industrials">🏭 Industrials</option>
+                                    <option value="Communication Services">📡 Communications</option>
                                 </select>
                             </div>
                             <div>
                                 <label class="text-sm text-gray-400 mb-1 block">Min Price</label>
-                                <input type="number" id="minPrice" value="10" min="1" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
+                                <input type="number" id="minPrice" value="1" min="0.01" step="0.01" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm border border-gray-600">
                             </div>
                             <div>
                                 <label class="text-sm text-gray-400 mb-1 block">Max Price</label>
-                                <input type="number" id="maxPrice" value="1000" min="1" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
+                                <input type="number" id="maxPrice" value="1000" min="0.01" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm border border-gray-600">
                             </div>
                             <div>
                                 <label class="text-sm text-gray-400 mb-1 block">Min Volume</label>
-                                <input type="number" id="minVolume" value="1000000" min="0" step="100000" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
+                                <input type="number" id="minVolume" value="100000" min="0" step="100000" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm border border-gray-600">
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 mb-1 block">Limit</label>
+                                <select id="limitResults" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm border border-gray-600">
+                                    <option value="25">25 Results</option>
+                                    <option value="50" selected>50 Results</option>
+                                    <option value="100">100 Results</option>
+                                    <option value="200">200 Results</option>
+                                </select>
                             </div>
                         </div>
+                        
                         <div class="flex items-center justify-between">
-                            <div class="text-sm text-gray-400">
-                                Found <span id="scanResults">0</span> stocks | Scanned <span id="scanTotal">24</span>
+                            <div class="flex items-center space-x-4">
+                                <div class="text-sm text-gray-400">
+                                    Found <span id="scanResults" class="text-blue-400 font-semibold">0</span> stocks | 
+                                    Scanned <span id="scanTotal" class="text-green-400 font-semibold">0</span> |
+                                    Universe: <span id="universeSize" class="text-purple-400 font-semibold">11,223</span>
+                                </div>
+                                <div id="scanTime" class="text-xs text-gray-500">
+                                    Last scan: --
+                                </div>
                             </div>
-                            <button onclick="runScan()" class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-all">
-                                <i class="fas fa-search mr-2"></i>Scan Now
-                            </button>
+                            <div class="flex space-x-2">
+                                <button onclick="loadScannerTypes()" class="bg-gray-600 hover:bg-gray-500 px-3 py-2 rounded-lg text-sm font-medium transition-all">
+                                    <i class="fas fa-sync-alt mr-1"></i>Refresh
+                                </button>
+                                <button onclick="runScan()" id="scanButton" class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                                    <i class="fas fa-search mr-2"></i>Scan Now
+                                </button>
+                            </div>
                         </div>
                     </div>
 
                     <!-- Scanner Results -->
                     <div class="flex-1 overflow-y-auto">
                         <div id="scannerResults" class="space-y-2">
+                            <div class="text-center text-gray-400 py-8">
+                                <i class="fas fa-search text-4xl mb-3 opacity-50"></i>
+                                <p>Click "Scan Now" or select a quick scan to find stocks</p>
+                                <p class="text-sm mt-2">Professional scanners ready with 11,223+ stocks</p>
+                            </div>
                             <!-- Results will be populated here -->
                             <div class="text-center text-gray-400 mt-8">
                                 <i class="fas fa-search text-4xl mb-4"></i>
@@ -1193,6 +1358,9 @@ async def get_root():
         window.addEventListener('load', function() {
             connectWebSocket();
             displaySystemMessage('Welcome to your AI Trading Assistant! Connecting to real-time services...');
+            
+            // Load scanner types after a short delay
+            setTimeout(loadScannerTypes, 1000);
         });
 
         window.addEventListener('focus', function() {
@@ -1312,6 +1480,32 @@ async def debug_api_status():
         
     except Exception as e:
         return {"error": f"Debug endpoint error: {str(e)}"}
+
+@app.get("/api/scanner/types") 
+async def get_scanner_types():
+    """Get list of available scanner types"""
+    return {
+        "scanner_types": {k: {"name": v["name"], "description": v["description"], "icon": v["icon"]} 
+                         for k, v in SCANNER_TYPES.items()},
+        "total_types": len(SCANNER_TYPES),
+        "universe_size": STOCK_UNIVERSE.get('total_stocks', 0)
+    }
+
+@app.get("/api/scanner/sectors")
+async def get_sectors():
+    """Get available sectors for filtering"""
+    sectors = STOCK_UNIVERSE.get('sectors', {})
+    sector_counts = {}
+    
+    # Count stocks per sector
+    for symbol, sector in sectors.items():
+        sector_counts[sector] = sector_counts.get(sector, 0) + 1
+    
+    return {
+        "sectors": list(set(sectors.values())) + ["ALL"],
+        "sector_counts": sector_counts,
+        "total_sectors": len(set(sectors.values()))
+    }
 
 async def fetch_stock_data_safely(symbol: str):
     """Safely fetch stock data with timeout and error handling"""
