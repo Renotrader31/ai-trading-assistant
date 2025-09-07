@@ -77,7 +77,7 @@ async def get_ai_analysis(user_message: str, market_data: Dict[str, Any]) -> str
         
         # Extract stock symbol if present
         import re
-        ticker_match = re.search(r'\b([A-Z]{2,5})\b', user_message.upper())
+        ticker_match = re.search(r'\\b([A-Z]{2,5})\\b', user_message.upper())
         ticker = ticker_match.group(1) if ticker_match else "MARKET"
         
         if any(word in query_lower for word in ['aapl', 'apple']):
@@ -617,7 +617,7 @@ async def get_root():
         // WebSocket connection
         function connectWebSocket() {
             const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-            const wsUrl = `${protocol}//${window.location.host}/ws`;
+            const wsUrl = protocol + '//' + window.location.host + '/ws';
             
             updateConnectionStatus('connecting');
             
@@ -626,7 +626,7 @@ async def get_root():
             ws.onopen = function() {
                 isConnected = true;
                 updateConnectionStatus('connected');
-                console.log('✅ WebSocket connected');
+                console.log('WebSocket connected');
             };
             
             ws.onmessage = function(event) {
@@ -637,8 +637,7 @@ async def get_root():
             ws.onclose = function() {
                 isConnected = false;
                 updateConnectionStatus('disconnected');
-                console.log('❌ WebSocket disconnected');
-                // Auto-reconnect after 3 seconds
+                console.log('WebSocket disconnected');
                 setTimeout(connectWebSocket, 3000);
             };
             
@@ -684,7 +683,7 @@ async def get_root():
                 ws.send(JSON.stringify({message: message}));
                 input.value = '';
             } else if (!isConnected) {
-                displaySystemMessage('❌ Not connected to server. Trying to reconnect...');
+                displaySystemMessage('Not connected to server. Trying to reconnect...');
                 connectWebSocket();
             }
         }
@@ -699,15 +698,7 @@ async def get_root():
             const messagesDiv = document.getElementById('chatMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = 'ai-chat-bubble ai-user';
-            messageDiv.innerHTML = `
-                <div class="flex items-start justify-end">
-                    <div class="text-right">
-                        <div class="text-sm text-blue-200 mb-1">You</div>
-                        <div>${message}</div>
-                    </div>
-                    <i class="fas fa-user text-blue-200 ml-3 mt-1"></i>
-                </div>
-            `;
+            messageDiv.innerHTML = '<div class="flex items-start justify-end"><div class="text-right"><div class="text-sm text-blue-200 mb-1">You</div><div>' + message + '</div></div><i class="fas fa-user text-blue-200 ml-3 mt-1"></i></div>';
             messagesDiv.appendChild(messageDiv);
             scrollToBottom();
         }
@@ -721,15 +712,7 @@ async def get_root():
             
             const formattedMessage = formatAIResponse(message);
             
-            messageDiv.innerHTML = `
-                <div class="flex items-start">
-                    <i class="fas fa-robot text-blue-400 mr-3 mt-1"></i>
-                    <div>
-                        <div class="text-sm text-gray-400 mb-1">AI Assistant</div>
-                        <div class="ai-response">${formattedMessage}</div>
-                    </div>
-                </div>
-            `;
+            messageDiv.innerHTML = '<div class="flex items-start"><i class="fas fa-robot text-blue-400 mr-3 mt-1"></i><div><div class="text-sm text-gray-400 mb-1">AI Assistant</div><div class="ai-response">' + formattedMessage + '</div></div></div>';
             messagesDiv.appendChild(messageDiv);
             scrollToBottom();
         }
@@ -738,10 +721,10 @@ async def get_root():
             return message
                 .replace(/## (.*?)$/gm, '<h3><i class="fas fa-chart-line mr-2"></i>$1</h3>')
                 .replace(/### (.*?)$/gm, '<h4><i class="fas fa-arrow-right mr-2"></i>$1</h4>')
-                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-                .replace(/\n/g, '<br>')
-                .replace(/(\$[\d,]+\.?\d*|\d+\.?\d*%)/g, '<span class="highlight">$1</span>')
-                .replace(/\b([A-Z]{2,5})\b/g, '<span class="highlight">$1</span>')
+                .replace(/\\*\\*(.*?)\\*\\*/g, '<strong>$1</strong>')
+                .replace(/\\n/g, '<br>')
+                .replace(/(\\$[\\d,]+\\.?\\d*|\\d+\\.?\\d*%)/g, '<span class="highlight">$1</span>')
+                .replace(/\\b([A-Z]{2,5})\\b/g, '<span class="highlight">$1</span>')
                 .replace(/📊/g, '<i class="fas fa-chart-bar text-blue-400"></i>')
                 .replace(/📈/g, '<i class="fas fa-chart-line text-green-400"></i>')
                 .replace(/📉/g, '<i class="fas fa-chart-line-down text-red-400"></i>')
@@ -755,15 +738,7 @@ async def get_root():
             const messagesDiv = document.getElementById('chatMessages');
             const messageDiv = document.createElement('div');
             messageDiv.className = 'ai-chat-bubble ai-assistant opacity-75';
-            messageDiv.innerHTML = `
-                <div class="flex items-start">
-                    <i class="fas fa-info-circle text-gray-400 mr-3 mt-1"></i>
-                    <div>
-                        <div class="text-sm text-gray-500 mb-1">System</div>
-                        <div class="text-gray-400 text-sm">${message}</div>
-                    </div>
-                </div>
-            `;
+            messageDiv.innerHTML = '<div class="flex items-start"><i class="fas fa-info-circle text-gray-400 mr-3 mt-1"></i><div><div class="text-sm text-gray-500 mb-1">System</div><div class="text-gray-400 text-sm">' + message + '</div></div></div>';
             messagesDiv.appendChild(messageDiv);
             scrollToBottom();
         }
@@ -773,22 +748,7 @@ async def get_root():
             const typingDiv = document.createElement('div');
             typingDiv.id = 'typingIndicator';
             typingDiv.className = 'ai-chat-bubble ai-assistant';
-            typingDiv.innerHTML = `
-                <div class="flex items-start">
-                    <i class="fas fa-robot text-blue-400 mr-3 mt-1"></i>
-                    <div>
-                        <div class="text-sm text-gray-400 mb-1">AI Assistant</div>
-                        <div class="typing-indicator">
-                            Analyzing market data and generating insights
-                            <div class="typing-dots">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            `;
+            typingDiv.innerHTML = '<div class="flex items-start"><i class="fas fa-robot text-blue-400 mr-3 mt-1"></i><div><div class="text-sm text-gray-400 mb-1">AI Assistant</div><div class="typing-indicator">Analyzing market data and generating insights<div class="typing-dots"><span></span><span></span><span></span></div></div></div></div>';
             messagesDiv.appendChild(typingDiv);
             scrollToBottom();
         }
@@ -813,7 +773,7 @@ async def get_root():
 
         window.addEventListener('load', function() {
             connectWebSocket();
-            displaySystemMessage('🚀 Welcome to your AI Trading Assistant! Connecting to real-time services...');
+            displaySystemMessage('Welcome to your AI Trading Assistant! Connecting to real-time services...');
         });
 
         window.addEventListener('focus', function() {
@@ -837,7 +797,7 @@ async def websocket_endpoint(websocket: WebSocket):
             if user_message:
                 # Extract potential stock symbol
                 import re
-                symbol_match = re.search(r'\b([A-Z]{1,5})\b', user_message.upper())
+                symbol_match = re.search(r'\\b([A-Z]{1,5})\\b', user_message.upper())
                 symbol = symbol_match.group(1) if symbol_match else None
                 
                 # Get market data if symbol found
