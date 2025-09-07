@@ -53,7 +53,7 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
         }
     
     try:
-        async with httpx.AsyncClient() as client:
+        async with httpx.AsyncClient(timeout=10.0) as client:
             # Get ticker details
             details_url = f"https://api.polygon.io/v3/reference/tickers/{symbol}?apikey={POLYGON_API_KEY}"
             details_response = await client.get(details_url)
@@ -62,12 +62,71 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             prev_close_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={POLYGON_API_KEY}"
             prev_close_response = await client.get(prev_close_url)
             
-            return {
-                "details": details_response.json() if details_response.status_code == 200 else {},
-                "previous_close": prev_close_response.json() if prev_close_response.status_code == 200 else {}
+            # Get real-time quote (if available)
+            quote_url = f"https://api.polygon.io/v2/last/trade/{symbol}?apikey={POLYGON_API_KEY}"
+            quote_response = await client.get(quote_url)
+            
+            # Parse the responses
+            details_data = details_response.json() if details_response.status_code == 200 else {}
+            prev_close_data = prev_close_response.json() if prev_close_response.status_code == 200 else {}
+            quote_data = quote_response.json() if quote_response.status_code == 200 else {}
+            
+            # Extract key information and format it consistently
+            current_price = None
+            prev_close_price = None
+            
+            # Try to get current price from last trade
+            if quote_data.get('results'):
+                current_price = quote_data['results'].get('p')
+            
+            # Get previous close price
+            if prev_close_data.get('results') and len(prev_close_data['results']) > 0:
+                prev_close_price = prev_close_data['results'][0].get('c')
+                if not current_price:  # Use prev close as current if no real-time data
+                    current_price = prev_close_price
+            
+            # Get company details
+            company_name = symbol
+            market_cap = "N/A"
+            if details_data.get('results'):
+                company_name = details_data['results'].get('name', symbol)
+                market_cap = details_data['results'].get('market_cap', "N/A")
+            
+            # Calculate change if we have both prices
+            change = 0
+            change_percent = 0
+            if current_price and prev_close_price:
+                change = current_price - prev_close_price
+                change_percent = (change / prev_close_price) * 100 if prev_close_price > 0 else 0
+            
+            # Format market data for AI analysis
+            formatted_data = {
+                "live_data": True,
+                "symbol": symbol,
+                "company_name": company_name,
+                "price": current_price or 0,
+                "previous_close": prev_close_price or 0,
+                "change": change,
+                "change_percent": change_percent,
+                "market_cap": market_cap,
+                "timestamp": datetime.now().isoformat(),
+                "raw_data": {
+                    "details": details_data,
+                    "previous_close": prev_close_data,
+                    "quote": quote_data
+                }
             }
+            
+            return formatted_data
+            
     except Exception as e:
-        return {"error": str(e)}
+        # Return error but with proper structure
+        return {
+            "error": str(e),
+            "symbol": symbol,
+            "live_data": False,
+            "fallback": True
+        }
 
 async def get_ai_analysis(user_message: str, market_data: Dict[str, Any]) -> str:
     """Get AI analysis from Claude or return enhanced demo response"""
@@ -101,26 +160,38 @@ async def get_ai_analysis(user_message: str, market_data: Dict[str, Any]) -> str
     
     try:
         # Real Claude AI integration with model fallback
+        data_source = "LIVE POLYGON.IO DATA" if market_data.get("live_data") else "DEMO DATA"
+        
         context = f"""
         User Query: {user_message}
         
+        DATA SOURCE: {data_source}
+        
         Market Data: {json.dumps(market_data, indent=2)}
         
-        Please provide a comprehensive trading analysis with enhanced formatting:
+        IMPORTANT: Use the EXACT price and market data provided above. If live_data=true, this is real-time market data from Polygon.io API.
         
-        ## 📊 Market Analysis
-        [Your detailed analysis here]
+        Please provide a comprehensive trading analysis with enhanced formatting using the ACTUAL market data:
+        
+        ## 📊 Market Analysis for {market_data.get('symbol', 'SYMBOL')}
+        
+        **Current Price**: ${market_data.get('price', 0):.2f}
+        **Previous Close**: ${market_data.get('previous_close', 0):.2f}  
+        **Change**: {'+' if market_data.get('change', 0) >= 0 else ''}{market_data.get('change', 0):.2f} ({market_data.get('change_percent', 0):+.2f}%)
+        
+        [Your detailed analysis based on the ACTUAL price data above]
         
         ## 🎯 Trading Recommendations  
-        [Your recommendations with specific price targets]
+        [Your recommendations with specific price targets based on current ${market_data.get('price', 0):.2f} price]
         
         ## ⚠️ Risk Assessment
         [Risk factors and mitigation strategies]
         
         ## 📈 Technical Indicators
-        [Key technical levels and signals]
+        [Key technical levels and signals based on current data]
         
         Use markdown formatting, emojis, and highlight key financial data with **bold** text.
+        Ensure all price references use the ACTUAL current price of ${market_data.get('price', 0):.2f}.
         """
         
         async with httpx.AsyncClient(timeout=30.0) as client:
