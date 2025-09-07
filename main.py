@@ -91,8 +91,16 @@ async def get_ai_analysis(user_message: str, market_data: Dict[str, Any]) -> str
         else:
             return generate_demo_stock_analysis(ticker, market_data)
     
+    # Try different Claude models in order of preference
+    models_to_try = [
+        "claude-3-5-sonnet-20241022",
+        "claude-3-5-haiku-20241022", 
+        "claude-3-sonnet-20240229",
+        "claude-3-haiku-20240307"
+    ]
+    
     try:
-        # Real Claude AI integration
+        # Real Claude AI integration with model fallback
         context = f"""
         User Query: {user_message}
         
@@ -115,26 +123,50 @@ async def get_ai_analysis(user_message: str, market_data: Dict[str, Any]) -> str
         Use markdown formatting, emojis, and highlight key financial data with **bold** text.
         """
         
-        async with httpx.AsyncClient() as client:
-            response = await client.post(
-                "https://api.anthropic.com/v1/messages",
-                headers={
-                    "x-api-key": ANTHROPIC_API_KEY,
-                    "anthropic-version": "2023-06-01",
-                    "content-type": "application/json"
-                },
-                json={
-                    "model": "claude-3-sonnet-20240229",
-                    "max_tokens": 1000,
-                    "messages": [{"role": "user", "content": context}]
-                }
-            )
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            last_error = None
             
-            if response.status_code == 200:
-                result = response.json()
-                return result["content"][0]["text"]
-            else:
-                return f"❌ **Error**: AI service returned {response.status_code}"
+            # Try each model in order
+            for model in models_to_try:
+                try:
+                    response = await client.post(
+                        "https://api.anthropic.com/v1/messages",
+                        headers={
+                            "x-api-key": ANTHROPIC_API_KEY,
+                            "anthropic-version": "2023-06-01",
+                            "content-type": "application/json"
+                        },
+                        json={
+                            "model": model,
+                            "max_tokens": 1000,
+                            "messages": [{"role": "user", "content": context}]
+                        }
+                    )
+                    
+                    if response.status_code == 200:
+                        result = response.json()
+                        return result["content"][0]["text"]
+                    elif response.status_code == 401:
+                        return f"❌ **API Key Error**: Invalid or missing Anthropic API key. Please check your ANTHROPIC_API_KEY environment variable."
+                    elif response.status_code == 404:
+                        # Try next model if 404
+                        continue
+                    else:
+                        error_text = ""
+                        try:
+                            error_json = response.json()
+                            error_text = error_json.get("error", {}).get("message", str(response.text))
+                        except:
+                            error_text = response.text
+                        last_error = f"❌ **Error {response.status_code}**: {error_text}"
+                        continue
+                        
+                except Exception as e:
+                    last_error = f"❌ **Model {model} Error**: {str(e)}"
+                    continue
+            
+            # If all models failed
+            return f"❌ **All Models Failed**: {last_error or 'Unable to connect to Claude API'}"
                 
     except Exception as e:
         return f"❌ **Error**: {str(e)}"
