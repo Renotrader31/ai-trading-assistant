@@ -5,8 +5,9 @@ import httpx
 import asyncio
 from typing import Dict, Any
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import uvicorn
+import time
 
 # Create FastAPI app
 app = FastAPI(title="AI Trading Assistant", description="Beautiful Polygon.io + Claude AI Platform")
@@ -14,6 +15,10 @@ app = FastAPI(title="AI Trading Assistant", description="Beautiful Polygon.io + 
 # API Keys from environment
 POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "demo_key")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "demo_key")
+
+# Cache for market data to reduce API calls
+market_data_cache = {}
+CACHE_DURATION = 30  # seconds
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -59,8 +64,13 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             "52_week_low": 164.08
         }
     
+    # Check cache first
+    cache_key = f"{symbol}_{int(time.time() // CACHE_DURATION)}"
+    if cache_key in market_data_cache:
+        return market_data_cache[cache_key]
+    
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:
+        async with httpx.AsyncClient(timeout=5.0) as client:
             print(f"DEBUG: Fetching data for {symbol} with Polygon API")
             
             # Get previous close (most reliable endpoint)
@@ -154,6 +164,10 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             }
             
             print(f"DEBUG: Formatted data: {formatted_data}")
+            
+            # Cache the result
+            market_data_cache[cache_key] = formatted_data
+            
             return formatted_data
             
     except Exception as e:
@@ -236,7 +250,7 @@ async def get_ai_analysis(user_message: str, market_data: Dict[str, Any]) -> str
         Ensure all price references use the ACTUAL current price of ${market_data.get('price', 0):.2f}.
         """
         
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=15.0) as client:
             last_error = None
             
             # Try each model in order
@@ -1417,7 +1431,8 @@ async def websocket_endpoint(websocket: WebSocket):
     await manager.connect(websocket)
     try:
         while True:
-            data = await websocket.receive_text()
+            # Add timeout to prevent hanging WebSocket connections
+            data = await asyncio.wait_for(websocket.receive_text(), timeout=300.0)  # 5 minute timeout
             message_data = json.loads(data)
             user_message = message_data.get("message", "")
             
@@ -1447,13 +1462,20 @@ async def websocket_endpoint(websocket: WebSocket):
                 
                 print(f"DEBUG: User message: '{user_message}', extracted symbol: '{symbol}'")
                 
-                # Get market data if symbol found
+                # Get market data if symbol found (with timeout protection)
                 market_data = {}
                 if symbol:
-                    market_data = await get_market_data(symbol)
+                    try:
+                        market_data = await asyncio.wait_for(get_market_data(symbol), timeout=5.0)
+                    except asyncio.TimeoutError:
+                        print(f"Timeout getting market data for {symbol}")
+                        market_data = {"error": "timeout", "symbol": symbol}
                 
-                # Get AI analysis
-                ai_response = await get_ai_analysis(user_message, market_data)
+                # Get AI analysis (with timeout protection)
+                try:
+                    ai_response = await asyncio.wait_for(get_ai_analysis(user_message, market_data), timeout=30.0)
+                except asyncio.TimeoutError:
+                    ai_response = "⚠️ **Request Timeout**: The AI analysis took too long. Please try again with a shorter query."
                 
                 # Send response back
                 await manager.send_personal_message(
@@ -1462,11 +1484,18 @@ async def websocket_endpoint(websocket: WebSocket):
                 )
     except WebSocketDisconnect:
         manager.disconnect(websocket)
+    except asyncio.TimeoutError:
+        print("WebSocket timeout - disconnecting client")
+        manager.disconnect(websocket)
     except Exception as e:
-        await manager.send_personal_message(
-            json.dumps({"message": f"❌ **Error**: {str(e)}"}), 
-            websocket
-        )
+        print(f"WebSocket error: {e}")
+        try:
+            await manager.send_personal_message(
+                json.dumps({"message": f"❌ **Error**: {str(e)}"}), 
+                websocket
+            )
+        except:
+            pass  # Connection might be broken
         manager.disconnect(websocket)
 
 @app.get("/health")
