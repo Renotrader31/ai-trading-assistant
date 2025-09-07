@@ -1313,6 +1313,17 @@ async def debug_api_status():
     except Exception as e:
         return {"error": f"Debug endpoint error: {str(e)}"}
 
+async def fetch_stock_data_safely(symbol: str):
+    """Safely fetch stock data with timeout and error handling"""
+    try:
+        return await asyncio.wait_for(get_market_data(symbol), timeout=3.0)
+    except asyncio.TimeoutError:
+        print(f"Timeout fetching data for {symbol}")
+        return {"error": "timeout", "symbol": symbol}
+    except Exception as e:
+        print(f"Error fetching data for {symbol}: {e}")
+        return {"error": str(e), "symbol": symbol}
+
 # Scanner API endpoints
 @app.get("/api/scanner/stocks")
 async def scanner_stocks(
