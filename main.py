@@ -36,6 +36,13 @@ class ConnectionManager:
 
 manager = ConnectionManager()
 
+# Popular stocks for scanner
+POPULAR_STOCKS = [
+    'AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'NFLX', 
+    'AMD', 'INTC', 'CRM', 'ORCL', 'ADBE', 'NOW', 'PYPL', 'UBER', 
+    'SHOP', 'SQ', 'ROKU', 'ZM', 'SNOW', 'PLTR', 'COIN', 'RBLX'
+]
+
 async def get_market_data(symbol: str) -> Dict[str, Any]:
     """Get market data from Polygon.io or return demo data"""
     if POLYGON_API_KEY == "demo_key":
@@ -574,6 +581,38 @@ async def get_root():
         .scroll-fade {
             mask-image: linear-gradient(to bottom, transparent 0%, black 5%, black 95%, transparent 100%);
         }
+        
+        .tab-active {
+            background: linear-gradient(135deg, #3B82F6, #1D4ED8);
+            color: white;
+        }
+        
+        .tab-inactive {
+            background: rgba(55, 65, 81, 0.5);
+            color: #9CA3AF;
+        }
+        
+        .tab-inactive:hover {
+            background: rgba(59, 130, 246, 0.2);
+            color: white;
+        }
+        
+        .tab-content {
+            display: block;
+        }
+        
+        .tab-content.hidden {
+            display: none;
+        }
+        
+        .scanner-result-row:hover {
+            background: rgba(59, 130, 246, 0.1);
+        }
+        
+        .scanner-filters {
+            background: rgba(31, 41, 55, 0.3);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+        }
     </style>
 </head>
 <body class="text-white">
@@ -586,9 +625,23 @@ async def get_root():
             <p class="text-xl text-gray-300">Powered by Polygon.io Real-Time Data + Claude AI Analysis</p>
         </div>
 
+        <!-- Tab Navigation -->
+        <div class="max-w-7xl mx-auto mb-6">
+            <div class="flex justify-center">
+                <div class="glass-effect rounded-xl p-2 flex space-x-2">
+                    <button onclick="showTab('chat')" id="tab-chat" class="tab-active px-6 py-2 rounded-lg font-medium transition-all">
+                        <i class="fas fa-comments mr-2"></i>AI Chat
+                    </button>
+                    <button onclick="showTab('scanner')" id="tab-scanner" class="tab-inactive px-6 py-2 rounded-lg font-medium transition-all">
+                        <i class="fas fa-search mr-2"></i>Stock Scanner
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div class="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <!-- Main Chat Interface -->
-            <div class="lg:col-span-2">
+            <!-- Chat Tab Content -->
+            <div id="content-chat" class="tab-content lg:col-span-2">
                 <div class="glass-effect rounded-2xl p-6 h-[600px] flex flex-col">
                     <!-- Chat Header -->
                     <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-600">
@@ -745,12 +798,226 @@ async def get_root():
                     </div>
                 </div>
             </div>
+            
+            <!-- Scanner Tab Content -->
+            <div id="content-scanner" class="tab-content hidden lg:col-span-2">
+                <div class="glass-effect rounded-2xl p-6 h-[600px] flex flex-col">
+                    <!-- Scanner Header -->
+                    <div class="flex items-center justify-between mb-4 pb-4 border-b border-gray-600">
+                        <div class="flex items-center">
+                            <i class="fas fa-search text-green-400 mr-3 text-xl"></i>
+                            <h2 class="text-xl font-semibold">Stock Scanner</h2>
+                        </div>
+                        <div id="scannerStatus" class="text-sm text-green-400">
+                            <i class="fas fa-chart-line mr-2"></i>Live Data Active
+                        </div>
+                    </div>
+
+                    <!-- Scanner Filters -->
+                    <div class="scanner-filters rounded-xl p-4 mb-4">
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-3">
+                            <div>
+                                <label class="text-sm text-gray-400 mb-1 block">Scan Type</label>
+                                <select id="scanType" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
+                                    <option value="ALL">All Stocks</option>
+                                    <option value="TOP_GAINERS">Top Gainers</option>
+                                    <option value="TOP_LOSERS">Top Losers</option>
+                                    <option value="HIGH_VOLUME">High Volume</option>
+                                    <option value="BREAKOUT">Breakouts</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 mb-1 block">Min Price</label>
+                                <input type="number" id="minPrice" value="10" min="1" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 mb-1 block">Max Price</label>
+                                <input type="number" id="maxPrice" value="1000" min="1" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
+                            </div>
+                            <div>
+                                <label class="text-sm text-gray-400 mb-1 block">Min Volume</label>
+                                <input type="number" id="minVolume" value="1000000" min="0" step="100000" class="w-full bg-gray-700 rounded-lg p-2 text-white text-sm">
+                            </div>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <div class="text-sm text-gray-400">
+                                Found <span id="scanResults">0</span> stocks | Scanned <span id="scanTotal">24</span>
+                            </div>
+                            <button onclick="runScan()" class="bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 px-4 py-2 rounded-lg text-sm font-medium transition-all">
+                                <i class="fas fa-search mr-2"></i>Scan Now
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Scanner Results -->
+                    <div class="flex-1 overflow-y-auto">
+                        <div id="scannerResults" class="space-y-2">
+                            <!-- Results will be populated here -->
+                            <div class="text-center text-gray-400 mt-8">
+                                <i class="fas fa-search text-4xl mb-4"></i>
+                                <p>Click "Scan Now" to find stocks matching your criteria</p>
+                                <p class="text-sm mt-2">Powered by live Polygon.io market data</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
         let ws = null;
         let isConnected = false;
+        let currentTab = 'chat';
+
+        // Tab Management
+        function showTab(tabName) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => {
+                tab.classList.add('hidden');
+            });
+            
+            // Remove active state from all tab buttons
+            document.querySelectorAll('[id^="tab-"]').forEach(btn => {
+                btn.className = btn.className.replace('tab-active', 'tab-inactive');
+            });
+            
+            // Show selected tab
+            document.getElementById('content-' + tabName).classList.remove('hidden');
+            document.getElementById('tab-' + tabName).className = document.getElementById('tab-' + tabName).className.replace('tab-inactive', 'tab-active');
+            
+            currentTab = tabName;
+            
+            // Initialize scanner if switching to scanner tab
+            if (tabName === 'scanner') {
+                // Auto-run scan when first opening scanner
+                setTimeout(() => runScan(), 500);
+            }
+        }
+
+        // Scanner Functions
+        async function runScan() {
+            const scanType = document.getElementById('scanType').value;
+            const minPrice = parseFloat(document.getElementById('minPrice').value);
+            const maxPrice = parseFloat(document.getElementById('maxPrice').value);
+            const minVolume = parseInt(document.getElementById('minVolume').value);
+            
+            // Show loading
+            const resultsDiv = document.getElementById('scannerResults');
+            resultsDiv.innerHTML = `
+                <div class="text-center text-blue-400 mt-8">
+                    <i class="fas fa-spinner fa-spin text-4xl mb-4"></i>
+                    <p>Scanning stocks with live market data...</p>
+                    <p class="text-sm mt-2">Analyzing ${document.getElementById('scanTotal').textContent} stocks</p>
+                </div>
+            `;
+            
+            try {
+                const response = await fetch(`/api/scanner/stocks?min_price=${minPrice}&max_price=${maxPrice}&min_volume=${minVolume}&scan_type=${scanType}`);
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                
+                displayScanResults(data);
+                
+            } catch (error) {
+                console.error('Scanner error:', error);
+                resultsDiv.innerHTML = `
+                    <div class="text-center text-red-400 mt-8">
+                        <i class="fas fa-exclamation-triangle text-4xl mb-4"></i>
+                        <p>Scanner Error: ${error.message}</p>
+                        <button onclick="runScan()" class="mt-4 bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-lg text-sm">
+                            Try Again
+                        </button>
+                    </div>
+                `;
+            }
+        }
+
+        function displayScanResults(data) {
+            const resultsDiv = document.getElementById('scannerResults');
+            document.getElementById('scanResults').textContent = data.matches;
+            document.getElementById('scanTotal').textContent = data.total_scanned;
+            
+            if (data.stocks.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="text-center text-gray-400 mt-8">
+                        <i class="fas fa-search text-4xl mb-4"></i>
+                        <p>No stocks found matching your criteria</p>
+                        <p class="text-sm mt-2">Try adjusting your filters and scan again</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            let html = '';
+            data.stocks.forEach(stock => {
+                const changeColor = stock.changePercent >= 0 ? 'text-green-400' : 'text-red-400';
+                const changeIcon = stock.changePercent >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
+                
+                html += `
+                    <div class="scanner-result-row bg-gray-800 bg-opacity-50 rounded-lg p-4 cursor-pointer transition-all" onclick="analyzeStock('${stock.symbol}')">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-4">
+                                <div>
+                                    <div class="font-bold text-white">${stock.symbol}</div>
+                                    <div class="text-sm text-gray-400">${stock.name}</div>
+                                </div>
+                                <div class="text-right">
+                                    <div class="font-semibold">$${stock.price}</div>
+                                    <div class="${changeColor} text-sm">
+                                        <i class="fas ${changeIcon} mr-1"></i>
+                                        ${stock.changePercent > 0 ? '+' : ''}${stock.changePercent}%
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-6 text-sm">
+                                <div class="text-center">
+                                    <div class="text-gray-400">Volume</div>
+                                    <div class="text-white">${formatNumber(stock.volume)}</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-gray-400">RSI</div>
+                                    <div class="text-white">${stock.rsi}</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-gray-400">Pattern</div>
+                                    <div class="text-white text-xs">${stock.pattern}</div>
+                                </div>
+                                <div class="text-center">
+                                    <div class="text-gray-400">Score</div>
+                                    <div class="text-yellow-400 font-bold">${Math.round(stock.score)}</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            resultsDiv.innerHTML = html;
+        }
+
+        function analyzeStock(symbol) {
+            // Switch to chat tab and analyze the stock
+            showTab('chat');
+            setTimeout(() => {
+                document.getElementById('messageInput').value = `Analyze ${symbol} for me`;
+                sendMessage();
+            }, 300);
+        }
+
+        function formatNumber(num) {
+            if (num >= 1000000000) {
+                return (num / 1000000000).toFixed(1) + 'B';
+            } else if (num >= 1000000) {
+                return (num / 1000000).toFixed(1) + 'M';
+            } else if (num >= 1000) {
+                return (num / 1000).toFixed(1) + 'K';
+            }
+            return num.toString();
+        }
 
         // WebSocket connection
         function connectWebSocket() {
@@ -1031,6 +1298,119 @@ async def debug_api_status():
         
     except Exception as e:
         return {"error": f"Debug endpoint error: {str(e)}"}
+
+# Scanner API endpoints
+@app.get("/api/scanner/stocks")
+async def scanner_stocks(
+    min_price: float = 10.0,
+    max_price: float = 1000.0,
+    min_volume: int = 1000000,
+    scan_type: str = "ALL"
+):
+    """Get filtered stocks based on scanner criteria"""
+    try:
+        results = []
+        
+        # Get data for popular stocks
+        for symbol in POPULAR_STOCKS[:15]:  # Limit to first 15 for performance
+            try:
+                market_data = await get_market_data(symbol)
+                if market_data.get("live_data") and market_data.get("price", 0) > 0:
+                    price = market_data.get("price", 0)
+                    volume = market_data.get("volume", 0)
+                    change = market_data.get("change", 0)
+                    change_percent = market_data.get("change_percent", 0)
+                    
+                    # Apply filters
+                    if min_price <= price <= max_price and volume >= min_volume:
+                        # Apply scan type filter
+                        include_stock = True
+                        
+                        if scan_type == "TOP_GAINERS" and change_percent <= 0:
+                            include_stock = False
+                        elif scan_type == "TOP_LOSERS" and change_percent >= 0:
+                            include_stock = False
+                        elif scan_type == "HIGH_VOLUME" and volume < min_volume * 2:
+                            include_stock = False
+                        elif scan_type == "BREAKOUT" and change_percent < 3:
+                            include_stock = False
+                        
+                        if include_stock:
+                            # Calculate technical indicators (simplified)
+                            rsi = max(30, min(70, 50 + change_percent * 2))
+                            
+                            results.append({
+                                "symbol": symbol,
+                                "name": market_data.get("company_name", symbol),
+                                "price": round(price, 2),
+                                "change": round(change, 2),
+                                "changePercent": round(change_percent, 2),
+                                "volume": volume,
+                                "marketCap": market_data.get("market_cap", "N/A"),
+                                "rsi": round(rsi, 1),
+                                "pattern": "Breakout" if change_percent > 3 else "Breakdown" if change_percent < -3 else "Consolidation",
+                                "score": max(1, min(100, 50 + change_percent * 5)),
+                                "sector": "Technology"  # Simplified
+                            })
+            except Exception as e:
+                print(f"Error processing {symbol}: {e}")
+                continue
+        
+        # Sort by score (best first)
+        results.sort(key=lambda x: x["score"], reverse=True)
+        
+        return {
+            "stocks": results,
+            "total_scanned": len(POPULAR_STOCKS),
+            "matches": len(results),
+            "filters": {
+                "min_price": min_price,
+                "max_price": max_price,
+                "min_volume": min_volume,
+                "scan_type": scan_type
+            }
+        }
+        
+    except Exception as e:
+        return {"error": str(e), "stocks": [], "matches": 0}
+
+@app.get("/api/scanner/summary")
+async def scanner_summary():
+    """Get market summary for scanner"""
+    try:
+        # Get a few key stocks for market overview
+        key_symbols = ['AAPL', 'TSLA', 'GOOGL', 'NVDA']
+        market_summary = {
+            "gainers": [],
+            "losers": [],
+            "active": [],
+            "market_status": "OPEN"
+        }
+        
+        for symbol in key_symbols:
+            try:
+                market_data = await get_market_data(symbol)
+                if market_data.get("live_data"):
+                    stock_info = {
+                        "symbol": symbol,
+                        "price": market_data.get("price", 0),
+                        "change_percent": market_data.get("change_percent", 0),
+                        "volume": market_data.get("volume", 0)
+                    }
+                    
+                    if stock_info["change_percent"] > 0:
+                        market_summary["gainers"].append(stock_info)
+                    else:
+                        market_summary["losers"].append(stock_info)
+                        
+                    market_summary["active"].append(stock_info)
+            except:
+                continue
+        
+        return market_summary
+    
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
