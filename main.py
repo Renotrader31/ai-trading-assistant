@@ -1042,10 +1042,29 @@ async def websocket_endpoint(websocket: WebSocket):
             user_message = message_data.get("message", "")
             
             if user_message:
-                # Extract potential stock symbol
+                # Extract potential stock symbol with better logic
                 import re
-                symbol_match = re.search(r'\b([A-Z]{2,5})\b', user_message.upper())
-                symbol = symbol_match.group(1) if symbol_match else None
+                
+                # Common stock symbols to look for specifically
+                known_symbols = ['AAPL', 'TSLA', 'GOOGL', 'AMZN', 'MSFT', 'NVDA', 'META', 'NFLX', 'AMD', 'INTC']
+                symbol = None
+                
+                # First, look for known symbols specifically
+                user_upper = user_message.upper()
+                for known_symbol in known_symbols:
+                    if known_symbol in user_upper:
+                        symbol = known_symbol
+                        break
+                
+                # If no known symbol found, try regex but exclude common words
+                if not symbol:
+                    excluded_words = ['WHAT', 'ABOUT', 'THINK', 'GIVE', 'TELL', 'SHOW', 'FIND', 'GET', 'HELP']
+                    matches = re.findall(r'\b([A-Z]{2,5})\b', user_upper)
+                    for match in matches:
+                        if match not in excluded_words:
+                            symbol = match
+                            break
+                
                 print(f"DEBUG: User message: '{user_message}', extracted symbol: '{symbol}'")
                 
                 # Get market data if symbol found
