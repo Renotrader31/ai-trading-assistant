@@ -74,7 +74,7 @@ SCANNER_TYPES = {
         'name': 'Top Gainers',
         'description': 'Stocks with highest percentage gains',
         'icon': '📈',
-        'filter': lambda data: data.get('change_percent', 0) >= 0.5  # Lowered from 2 to 0.5%
+        'filter': lambda data: data.get('change_percent', 0) >= 0.1  # Even more lenient: 0.1%
     },
     'TOP_LOSERS': {
         'name': 'Top Losers', 
@@ -92,7 +92,7 @@ SCANNER_TYPES = {
         'name': 'Breakout Stocks',
         'description': 'Stocks breaking through resistance levels',
         'icon': '🚀',
-        'filter': lambda data: data.get('change_percent', 0) > 2  # Lowered from 5 to 2%
+        'filter': lambda data: data.get('change_percent', 0) > 1.5  # Lowered to 1.5%
     },
     'OVERSOLD_RSI': {
         'name': 'Oversold (RSI < 30)',
@@ -116,7 +116,7 @@ SCANNER_TYPES = {
         'name': 'Momentum Stocks',
         'description': 'Stocks with strong upward momentum',
         'icon': '⚡',
-        'filter': lambda data: data.get('change_percent', 0) > 1 and data.get('volume', 0) > 500000  # More lenient
+        'filter': lambda data: data.get('change_percent', 0) > 0.5 and data.get('volume', 0) > 100000  # Very lenient
     },
     'TECH_STOCKS': {
         'name': 'Technology Sector',
@@ -1858,6 +1858,9 @@ async def scanner_stocks(
         
         # Process the results with enhanced filtering using SCANNER_TYPES
         scanner_config = SCANNER_TYPES.get(scan_type, SCANNER_TYPES['ALL'])
+        print(f"🔍 Scanner: {scan_type} | Config: {scanner_config['name']} | Examining {len(market_data_list)} stocks")
+        
+        filter_stats = {'total_examined': 0, 'price_filtered': 0, 'volume_filtered': 0, 'sector_filtered': 0, 'scanner_filtered': 0, 'passed_all': 0}
         
         for i, market_data in enumerate(market_data_list):
             symbol = symbols_to_scan[i]
@@ -1868,6 +1871,7 @@ async def scanner_stocks(
                     continue
                     
                 if market_data.get("live_data") and market_data.get("price", 0) > 0:
+                    filter_stats['total_examined'] += 1
                     price = market_data.get("price", 0)
                     volume = market_data.get("volume", 0)
                     change = market_data.get("change", 0)
@@ -1923,16 +1927,31 @@ async def scanner_stocks(
                     }
                     
                     # Apply basic filters
-                    if not (min_price <= price <= max_price and volume >= min_volume):
+                    if not (min_price <= price <= max_price):
+                        filter_stats['price_filtered'] += 1
+                        continue
+                    if volume < min_volume:
+                        filter_stats['volume_filtered'] += 1
                         continue
                     
                     # Apply sector filter
                     if sector != "ALL" and stock_sector != sector:
+                        filter_stats['sector_filtered'] += 1
                         continue
                     
                     # Apply scanner type filter using the professional definitions
-                    if not scanner_config['filter'](enhanced_stock_data):
+                    scanner_passed = scanner_config['filter'](enhanced_stock_data)
+                    if not scanner_passed:
+                        filter_stats['scanner_filtered'] += 1
+                        # Debug specific cases
+                        if scan_type in ['TOP_GAINERS', 'MOMENTUM_STOCKS', 'BREAKOUT_STOCKS'] and filter_stats['scanner_filtered'] <= 5:
+                            print(f"❌ {symbol}: change={change_percent:.2f}%, volume={volume:,} - Failed {scan_type} filter")
                         continue
+                    
+                    filter_stats['passed_all'] += 1
+                    # Debug successful matches for problematic scanners
+                    if scan_type in ['TOP_GAINERS', 'MOMENTUM_STOCKS', 'BREAKOUT_STOCKS'] and len(results) < 3:
+                        print(f"✅ {symbol}: change={change_percent:.2f}%, volume={volume:,} - Passed {scan_type} filter")
                     
                     # Calculate pattern and score
                     if change_percent > 5:
@@ -1976,6 +1995,9 @@ async def scanner_stocks(
         results.sort(key=lambda x: x["score"], reverse=True)
         
         total_time = time.time() - start_time
+        print(f"📊 Filter Results for {scan_type}:")
+        print(f"   Examined: {filter_stats['total_examined']} | Price filtered: {filter_stats['price_filtered']} | Volume filtered: {filter_stats['volume_filtered']}")
+        print(f"   Sector filtered: {filter_stats['sector_filtered']} | Scanner filtered: {filter_stats['scanner_filtered']} | ✅ Passed: {filter_stats['passed_all']}")
         print(f"🎯 Scanner completed in {total_time:.2f} seconds, found {len(results)} matching stocks from {len(symbols_to_scan)} scanned")
         
         return {
@@ -1992,7 +2014,8 @@ async def scanner_stocks(
                 "scan_type": scan_type,
                 "sector": sector,
                 "limit": limit
-            }
+            },
+            "debug_stats": filter_stats
         }
         
     except Exception as e:
