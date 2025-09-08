@@ -1521,6 +1521,52 @@ async def get_root():
 </body>
 </html>"""
 
+@app.get("/simple-debug")
+async def simple_debug():
+    """Simple debug endpoint to test deployment"""
+    import os
+    from datetime import datetime
+    
+    return {
+        "status": "OK",
+        "timestamp": datetime.now().isoformat(),
+        "deployment_working": True,
+        "polygon_key_status": "SET" if os.getenv("POLYGON_API_KEY", "demo_key") != "demo_key" else "MISSING",
+        "message": "If you can see this, the deployment is working!"
+    }
+
+@app.get("/test-realtime/{symbol}")
+async def test_realtime_simple(symbol: str):
+    """Simplified real-time test that's easier to debug"""
+    import os
+    
+    polygon_key = os.getenv("POLYGON_API_KEY", "demo_key") 
+    
+    if polygon_key == "demo_key":
+        return {
+            "error": "Polygon API key not configured",
+            "symbol": symbol,
+            "key_status": "MISSING"
+        }
+    
+    try:
+        # Test the function directly
+        result = await get_market_data(symbol)
+        return {
+            "success": True,
+            "symbol": symbol,
+            "result": result,
+            "data_source": result.get("data_source"),
+            "is_live": result.get("live_data", False)
+        }
+    except Exception as e:
+        return {
+            "error": str(e),
+            "symbol": symbol,
+            "success": False
+        }
+
+
 @app.get("/debug/env")
 async def debug_env():
     """Debug endpoint to check environment variables in Railway"""
