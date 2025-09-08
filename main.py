@@ -154,23 +154,23 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
         import hashlib
         seed = int(hashlib.md5(symbol.encode()).hexdigest()[:8], 16)
         
-        # 🚀 REALISTIC PRICE MAPPING for major stocks + random prices for others
+        # 🚀 REALISTIC PRICE MAPPING for major stocks (current market prices)
         realistic_prices = {
-            'AAPL': 175.50,    # Apple realistic price
-            'TSLA': 245.80,    # Tesla realistic price  
-            'GOOGL': 142.30,   # Google realistic price
-            'AMZN': 155.90,    # Amazon realistic price
-            'MSFT': 378.85,    # Microsoft realistic price
-            'NVDA': 465.20,    # Nvidia realistic price
-            'META': 338.40,    # Meta realistic price
-            'NFLX': 447.15,    # Netflix realistic price
-            'AMD': 138.95,     # AMD realistic price
-            'INTC': 23.45,     # Intel realistic price
-            'UBER': 68.50,     # Uber realistic price
-            'PYPL': 69.14,     # PayPal realistic price
-            'ADBE': 351.87,    # Adobe realistic price
-            'CRM': 267.30,     # Salesforce realistic price
-            'ORCL': 129.85,    # Oracle realistic price
+            'AAPL': 238.50,    # Apple current price ~$238
+            'TSLA': 350.80,    # Tesla current price ~$350  
+            'GOOGL': 175.30,   # Google current price
+            'AMZN': 185.90,    # Amazon current price
+            'MSFT': 425.85,    # Microsoft current price
+            'NVDA': 138.20,    # Nvidia current price  
+            'META': 565.40,    # Meta current price
+            'NFLX': 905.15,    # Netflix current price
+            'AMD': 125.95,     # AMD current price
+            'INTC': 21.45,     # Intel current price
+            'UBER': 68.50,     # Uber current price
+            'PYPL': 87.14,     # PayPal current price
+            'ADBE': 415.87,    # Adobe current price
+            'CRM': 325.30,     # Salesforce current price
+            'ORCL': 175.85,    # Oracle current price
         }
         
         # Use realistic price if available, otherwise generate varied prices
