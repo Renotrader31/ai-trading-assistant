@@ -19,7 +19,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "demo_key")
 
 # Cache for market data to reduce API calls
 market_data_cache = {}
-CACHE_DURATION = 0  # seconds - temporarily disabled for immediate price updates
+CACHE_DURATION = 5  # seconds - short cache for immediate updates but still functional
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -225,10 +225,11 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             "52_week_low": round(price * (0.7 - (seed % 30) / 100), 2)
         }
     
-    # Check cache first
-    cache_key = f"{symbol}_{int(time.time() // CACHE_DURATION)}"
-    if cache_key in market_data_cache:
-        return market_data_cache[cache_key]
+    # Check cache first (only if CACHE_DURATION > 0)
+    if CACHE_DURATION > 0:
+        cache_key = f"{symbol}_{int(time.time() // CACHE_DURATION)}"
+        if cache_key in market_data_cache:
+            return market_data_cache[cache_key]
     
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -337,8 +338,10 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             
             print(f"DEBUG: Formatted data: {formatted_data}")
             
-            # Cache the result
-            market_data_cache[cache_key] = formatted_data
+            # Cache the result (only if caching is enabled)
+            if CACHE_DURATION > 0:
+                cache_key = f"{symbol}_{int(time.time() // CACHE_DURATION)}"
+                market_data_cache[cache_key] = formatted_data
             
             return formatted_data
             
