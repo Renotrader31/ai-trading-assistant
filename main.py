@@ -19,7 +19,7 @@ ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "demo_key")
 
 # Cache for market data to reduce API calls
 market_data_cache = {}
-CACHE_DURATION = 30  # seconds
+CACHE_DURATION = 0  # seconds - temporarily disabled for immediate price updates
 
 # WebSocket connection manager
 class ConnectionManager:
