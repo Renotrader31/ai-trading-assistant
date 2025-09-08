@@ -186,18 +186,51 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             base_prices = [2.50, 8.75, 25.40, 67.20, 156.80, 245.60, 389.50]
             price = base_prices[seed % len(base_prices)] + (seed % 100) * 0.1
         
-        # Create realistic change percentages (-10% to +15%)
-        change_percent = ((seed % 2500) / 100) - 10  # Range: -10.00% to +15.00%
+        # 🚀 ENHANCED CHANGE DISTRIBUTION for ALL scanner types
+        # Create varied distribution to ensure ALL scanners find results
+        change_mode = seed % 100
+        
+        if change_mode < 20:  # 20% - Strong gainers (for TOP_GAINERS, BREAKOUT_STOCKS)
+            change_percent = 0.5 + (seed % 1500) / 100  # 0.5% to 15.5% gains
+        elif change_mode < 35:  # 15% - Moderate gainers (for MOMENTUM_STOCKS)
+            change_percent = 0.1 + (seed % 300) / 100   # 0.1% to 3.1% gains
+        elif change_mode < 50:  # 15% - Small gainers
+            change_percent = 0.01 + (seed % 50) / 100   # 0.01% to 0.51% gains
+        elif change_mode < 65:  # 15% - Small losers  
+            change_percent = -0.01 - (seed % 50) / 100  # -0.01% to -0.51% losses
+        elif change_mode < 80:  # 15% - Moderate losers (for TOP_LOSERS)
+            change_percent = -0.5 - (seed % 300) / 100  # -0.5% to -3.5% losses
+        else:  # 20% - Strong losers
+            change_percent = -1.0 - (seed % 1000) / 100 # -1% to -11% losses
         change = price * (change_percent / 100)
         previous_close = price - change
         
-        # Varied volume based on price (penny stocks = higher volume)
-        if price < 5:
-            volume = 5000000 + (seed % 50000000)  # Penny stocks: 5M-55M volume
-        elif price < 50:
-            volume = 1000000 + (seed % 10000000)  # Small cap: 1M-11M volume  
-        else:
-            volume = 500000 + (seed % 5000000)    # Large cap: 500K-5.5M volume
+        # 🚀 ENHANCED VOLUME DISTRIBUTION for scanner variety
+        # Ensure we have high-volume stocks for MOMENTUM_STOCKS and HIGH_VOLUME scanners
+        # Create volume distribution that ensures HIGH_VOLUME and MOMENTUM scanners work
+        volume_mode = (seed // 100) % 100
+        
+        if volume_mode < 25:  # 25% - High volume stocks (for HIGH_VOLUME scanner)
+            if price < 5:
+                volume = 10000000 + (seed % 90000000)  # Penny: 10M-100M volume
+            elif price < 50:
+                volume = 5000000 + (seed % 45000000)   # Small: 5M-50M volume
+            else:
+                volume = 2000000 + (seed % 20000000)   # Large: 2M-22M volume
+        elif volume_mode < 50:  # 25% - Moderate volume
+            if price < 5:
+                volume = 2000000 + (seed % 8000000)    # Penny: 2M-10M volume
+            elif price < 50:
+                volume = 800000 + (seed % 2200000)     # Small: 800K-3M volume
+            else:
+                volume = 600000 + (seed % 1400000)     # Large: 600K-2M volume
+        else:  # 50% - Lower volume (but still above minimums for some scanners)
+            if price < 5:
+                volume = 500000 + (seed % 1500000)     # Penny: 500K-2M volume
+            elif price < 50:
+                volume = 200000 + (seed % 800000)      # Small: 200K-1M volume
+            else:
+                volume = 100000 + (seed % 400000)      # Large: 100K-500K volume
             
         # Market cap based on price
         if price < 5:
@@ -345,11 +378,31 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
                     base_prices = [25.40, 67.20, 156.80, 245.60, 389.50]
                     price = base_prices[seed % len(base_prices)] + (seed % 50) * 0.1
                 
-                # Generate realistic market data as fallback
-                change_percent = ((seed % 2000) / 100) - 10  # -10% to +10%
+                # 🚀 ENHANCED FALLBACK DATA - same logic as demo
+                change_mode = seed % 100
+                
+                if change_mode < 20:  # 20% - Strong gainers
+                    change_percent = 0.5 + (seed % 1500) / 100  # 0.5% to 15.5% gains
+                elif change_mode < 35:  # 15% - Moderate gainers
+                    change_percent = 0.1 + (seed % 300) / 100   # 0.1% to 3.1% gains
+                elif change_mode < 50:  # 15% - Small gainers
+                    change_percent = 0.01 + (seed % 50) / 100   # 0.01% to 0.51% gains
+                elif change_mode < 65:  # 15% - Small losers  
+                    change_percent = -0.01 - (seed % 50) / 100  # -0.01% to -0.51% losses
+                elif change_mode < 80:  # 15% - Moderate losers
+                    change_percent = -0.5 - (seed % 300) / 100  # -0.5% to -3.5% losses
+                else:  # 20% - Strong losers
+                    change_percent = -1.0 - (seed % 1000) / 100 # -1% to -11% losses
+                    
                 change = price * (change_percent / 100)
                 previous_close = price - change
-                volume = 1000000 + (seed % 10000000)
+                
+                # Enhanced volume distribution
+                volume_mode = (seed // 100) % 100
+                if volume_mode < 30:  # High volume
+                    volume = 2000000 + (seed % 20000000)  # 2M-22M
+                else:  # Moderate volume  
+                    volume = 500000 + (seed % 5000000)    # 500K-5.5M
                 
                 return {
                     "fallback_demo": True,
@@ -422,11 +475,31 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             base_prices = [25.40, 67.20, 156.80, 245.60, 389.50]
             price = base_prices[seed % len(base_prices)] + (seed % 50) * 0.1
         
-        # Generate realistic market data as fallback
-        change_percent = ((seed % 2000) / 100) - 10  # -10% to +10%
+        # 🚀 ENHANCED EXCEPTION FALLBACK DATA - same logic as demo
+        change_mode = seed % 100
+        
+        if change_mode < 20:  # 20% - Strong gainers
+            change_percent = 0.5 + (seed % 1500) / 100  # 0.5% to 15.5% gains
+        elif change_mode < 35:  # 15% - Moderate gainers
+            change_percent = 0.1 + (seed % 300) / 100   # 0.1% to 3.1% gains
+        elif change_mode < 50:  # 15% - Small gainers
+            change_percent = 0.01 + (seed % 50) / 100   # 0.01% to 0.51% gains
+        elif change_mode < 65:  # 15% - Small losers  
+            change_percent = -0.01 - (seed % 50) / 100  # -0.01% to -0.51% losses
+        elif change_mode < 80:  # 15% - Moderate losers
+            change_percent = -0.5 - (seed % 300) / 100  # -0.5% to -3.5% losses
+        else:  # 20% - Strong losers
+            change_percent = -1.0 - (seed % 1000) / 100 # -1% to -11% losses
+            
         change = price * (change_percent / 100)
         previous_close = price - change
-        volume = 1000000 + (seed % 10000000)
+        
+        # Enhanced volume distribution
+        volume_mode = (seed // 100) % 100
+        if volume_mode < 30:  # High volume
+            volume = 2000000 + (seed % 20000000)  # 2M-22M
+        else:  # Moderate volume  
+            volume = 500000 + (seed % 5000000)    # 500K-5.5M
         
         return {
             "fallback_demo": True,
