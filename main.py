@@ -2715,7 +2715,23 @@ async def diagnose_realtime_api(symbol: str = "AMZN"):
             "result": result,
             "data_source": result.get("data_source"),
             "live_data_flag": result.get("live_data"),
-            "p
+            "price": result.get("price"),
+            "is_fallback": result.get("data_source") in ["api_fallback", "error_fallback", "demo"]
+        }
+        
+        # Identify the specific issue
+        if diagnosis["function_test"]["is_fallback"]:
+            diagnosis["errors"].append(f"get_market_data is using fallback data source: {result.get('data_source')}")
+        
+    except Exception as e:
+        diagnosis["function_test"] = {
+            "success": False,
+            "error": str(e)
+        }
+        diagnosis["errors"].append(f"get_market_data function error: {str(e)}")
+    
+    diagnosis["diagnosis_complete"] = True
+    return diagnosis
 @app.get("/api/scanner/fmp/all")
 async def fmp_all_stocks(limit: int = 25):
     """Get mixed results - combination of gainers and volume for 'all' scanner"""
@@ -2758,42 +2774,6 @@ async def fmp_all_stocks(limit: int = 25):
             "error": str(e),
             "stocks": []
         }
-
-
-rice": result.get("price"),
-            "is_fallback": result.get("data_source") in ["api_fallback", "error_fallback", "demo"]
-        }
-        
-        # Identify the specific issue
-        if diagnosis["function_test"]["is_fallback"]:
-            diagnosis["errors"].append(f"get_market_data is using fallback data source: {result.get('data_source')}")
-        
-    except Exception as e:
-        diagnosis["function_test"] = {
-            "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
-        }
-        diagnosis["errors"].append(f"get_market_data function error: {str(e)}")
-    
-    # Step 4: Generate recommendations
-    diagnosis["recommendations"] = []
-    
-    if diagnosis["environment"]["polygon_api_key_status"] == "MISSING":
-        diagnosis["recommendations"].append("Set POLYGON_API_KEY environment variable in Railway")
-    
-    if diagnosis["api_tests"].get("current_price", {}).get("status_code") == 403:
-        diagnosis["recommendations"].append("Upgrade Polygon API plan to include real-time data access")
-    
-    if diagnosis["api_tests"].get("current_price", {}).get("status_code") == 401:
-        diagnosis["recommendations"].append("Verify Polygon API key is valid and properly formatted")
-    
-    if diagnosis["function_test"].get("is_fallback"):
-        diagnosis["recommendations"].append("Check get_market_data function logic for proper error handling")
-    
-    diagnosis["diagnosis_complete"] = True
-    return diagnosis
-
 
 
 @app.websocket("/ws")
