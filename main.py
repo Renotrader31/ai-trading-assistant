@@ -179,10 +179,8 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
         
         # Use realistic price if available, otherwise generate varied prices
         if symbol in realistic_prices:
-            base_price = realistic_prices[symbol]
-            # Add small realistic variation (-2% to +3%)
-            variation = ((seed % 500) / 100) - 2  # -2% to +3%
-            price = base_price * (1 + variation / 100)
+            # Use EXACT price without variation for accuracy
+            price = realistic_prices[symbol]
         else:
             # For unknown stocks, use varied price ranges
             base_prices = [2.50, 8.75, 25.40, 67.20, 156.80, 245.60, 389.50]
@@ -2002,7 +2000,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "polygon_configured": POLYGON_API_KEY != "demo_key",
         "anthropic_configured": ANTHROPIC_API_KEY != "demo_key",
-        "version": "emergency-fix-v3-force-rebuild",
+        "version": "exact-prices-v4",
         "cache_duration": CACHE_DURATION,
         "amd_price_test": (await get_market_data("AMD")).get("price", "error")
     }
