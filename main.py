@@ -2307,9 +2307,12 @@ async def fmp_high_volume(limit: int = 20):
 
 @app.get("/api/scanner/fmp/breakouts")
 async def fmp_breakouts(limit: int = 20):
-    """Get breakout stocks using FMP real-time data - REALISTIC FILTERS"""/losers") 
+    """Get breakout stocks using FMP real-time data - REALISTIC FILTERS"""
+    return await fmp_scanner_scan("breakouts", min_price=10.0, limit=limit)
+
+@app.get("/api/scanner/fmp/losers") 
 async def fmp_top_losers(limit: int = 20):
-    """Get top losers using FMP real-time data"""
+    """Get top losers using FMP real-time data - REALISTIC FILTERS"""
     return await fmp_scanner_scan("top_losers", min_price=5.0, limit=limit)
 
 @app.get("/api/scanner/fmp/volume")
