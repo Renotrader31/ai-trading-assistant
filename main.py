@@ -8,6 +8,7 @@ import os
 from datetime import datetime, timedelta
 import uvicorn
 import time
+import random
 
 # Create FastAPI app
 app = FastAPI(title="AI Trading Assistant", description="Beautiful Polygon.io + Claude AI Platform")

@@ -35,7 +35,7 @@ async def test_enhanced_scanner():
     for scan_type, name in test_scans:
         print(f"\n📈 Testing {name} scanner...")
         try:
-            result = await scanner_stocks(scan_type=scan_type, limit=15, min_volume=100000)
+            result = await scanner_stocks(scan_type=scan_type, limit=25, min_volume=100000)
             
             if result.get('error'):
                 print(f"❌ Error: {result['error']}")
