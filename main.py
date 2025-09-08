@@ -86,7 +86,7 @@ SCANNER_TYPES = {
         'name': 'High Volume',
         'description': 'Stocks with unusually high trading volume',
         'icon': '📊',
-        'filter': lambda data: data.get('volume', 0) > 1000000  # Lowered from 5M to 1M
+        'filter': lambda data: data.get('volume', 0) > 500000  # Lowered to 500K for more results
     },
     'BREAKOUT_STOCKS': {
         'name': 'Breakout Stocks',
@@ -128,19 +128,19 @@ SCANNER_TYPES = {
         'name': 'Healthcare Sector',
         'description': 'Healthcare sector stocks',
         'icon': '🏥',
-        'filter': lambda data: data.get('sector', '') == 'Healthcare'
+        'filter': lambda data: data.get('sector', '').lower() in ['healthcare', 'health', 'biotech', 'pharmaceutical', 'medical']
     },
     'FINANCIAL_STOCKS': {
         'name': 'Financial Sector',
         'description': 'Financial sector stocks',
         'icon': '🏦',
-        'filter': lambda data: data.get('sector', '') == 'Financial'
+        'filter': lambda data: data.get('sector', '').lower() in ['financial', 'finance', 'bank', 'banking', 'insurance']
     },
     'ENERGY_STOCKS': {
         'name': 'Energy Sector', 
         'description': 'Energy sector stocks',
         'icon': '⛽',
-        'filter': lambda data: data.get('sector', '') == 'Energy'
+        'filter': lambda data: data.get('sector', '').lower() in ['energy', 'oil', 'gas', 'petroleum', 'renewable']
     },
     'ALL': {
         'name': 'All Stocks',
@@ -1057,7 +1057,7 @@ async def get_root():
                         <div class="status-card">
                             <div class="flex items-center justify-between">
                                 <span class="text-sm">Market Data</span>
-                                <span class="text-green-400"><i class="fas fa-check-circle"></i> Live</span>
+                                <span class="text-yellow-400"><i class="fas fa-flask"></i> Demo Mode</span>
                             </div>
                         </div>
                         <div class="status-card">
@@ -2058,7 +2058,9 @@ async def scanner_stocks(
                         "score": round(score, 1),
                         "sector": stock_sector,
                         "52w_status": "High" if near_52w_high else "Low" if near_52w_low else "Normal",
-                        "cached": "cached" in str(market_data)
+                        "cached": "cached" in str(market_data),
+                        "data_source": "demo" if market_data.get("demo") else "live" if market_data.get("live_data") else "unknown",
+                        "real_time": not market_data.get("demo", False)
                     })
             except Exception as e:
                 print(f"Error processing {symbol}: {e}")
@@ -2068,10 +2070,17 @@ async def scanner_stocks(
         results.sort(key=lambda x: x["score"], reverse=True)
         
         total_time = time.time() - start_time
+        # Check data source
+        data_sources = {}
+        for result in results:
+            source = result.get('data_source', 'unknown')
+            data_sources[source] = data_sources.get(source, 0) + 1
+            
         print(f"📊 Filter Results for {scan_type}:")
         print(f"   Examined: {filter_stats['total_examined']} | Price filtered: {filter_stats['price_filtered']} | Volume filtered: {filter_stats['volume_filtered']}")
         print(f"   Sector filtered: {filter_stats['sector_filtered']} | Scanner filtered: {filter_stats['scanner_filtered']} | ✅ Passed: {filter_stats['passed_all']}")
         print(f"🎯 Scanner completed in {total_time:.2f} seconds, found {len(results)} matching stocks from {len(symbols_to_scan)} scanned")
+        print(f"📊 Data Sources: {dict(data_sources)}")
         
         return {
             "stocks": results,
@@ -2088,7 +2097,8 @@ async def scanner_stocks(
                 "sector": sector,
                 "limit": limit
             },
-            "debug_stats": filter_stats
+            "debug_stats": filter_stats,
+            "data_sources": data_sources
         }
         
     except Exception as e:
