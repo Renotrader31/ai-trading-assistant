@@ -171,13 +171,18 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             print(f"🔍 Fetching live data for {symbol}")
+            print(f"🔑 API Key status: {'SET' if POLYGON_API_KEY != 'demo_key' else 'DEMO_MODE'}")
+            print(f"🔗 API Key preview: {POLYGON_API_KEY[:8]}...")
             
             # Get previous close only - simpler and more reliable
             prev_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={POLYGON_API_KEY}"
             response = await client.get(prev_url)
             
+            print(f"📡 Response status: {response.status_code}")
+            
             if response.status_code == 200:
                 data = response.json()
+                print(f"📊 Response keys: {list(data.keys())}")
                 if data.get('results') and len(data['results']) > 0:
                     result = data['results'][0]
                     
@@ -1458,11 +1463,98 @@ async def debug_env():
     
     return env_info
 
+@app.get("/debug/polygon/{symbol}")
+async def debug_polygon_live(symbol: str):
+    """Debug Polygon API call in Railway environment"""
+    import os
+    
+    # Get the actual API key from environment
+    api_key = os.environ.get('POLYGON_API_KEY', 'demo_key')
+    
+    if api_key == "demo_key":
+        return {"error": "No Polygon API key configured"}
+    
+    debug_info = {
+        "symbol": symbol,
+        "api_key_status": "SET",
+        "api_key_length": len(api_key),
+        "api_key_preview": api_key[:8] + "...",
+        "steps": []
+    }
+    
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={api_key}"
+            debug_info["url"] = url[:60] + "..."
+            debug_info["steps"].append("Making API request")
+            
+            response = await client.get(url)
+            debug_info["response_status"] = response.status_code
+            debug_info["steps"].append(f"Got response: {response.status_code}")
+            
+            if response.status_code == 200:
+                data = response.json()
+                debug_info["response_keys"] = list(data.keys())
+                debug_info["steps"].append(f"Parsed JSON, keys: {list(data.keys())}")
+                
+                if data.get('results') and len(data['results']) > 0:
+                    result = data['results'][0]
+                    debug_info["result_keys"] = list(result.keys())
+                    debug_info["close_price"] = result.get('c')
+                    debug_info["open_price"] = result.get('o')
+                    debug_info["volume"] = result.get('v')
+                    debug_info["steps"].append(f"SUCCESS: Found price ${result.get('c')}")
+                    
+                    # Calculate change
+                    close_price = result.get('c', 0)
+                    open_price = result.get('o', close_price)
+                    change = close_price - open_price
+                    change_percent = (change / open_price * 100) if open_price > 0 else 0
+                    
+                    debug_info["calculated_change"] = {
+                        "change": round(change, 2),
+                        "change_percent": round(change_percent, 2)
+                    }
+                else:
+                    debug_info["error"] = "No results in API response"
+                    debug_info["raw_response"] = data
+            else:
+                debug_info["error"] = f"API returned {response.status_code}"
+                debug_info["error_text"] = response.text[:200]
+                
+    except Exception as e:
+        debug_info["exception"] = str(e)
+        debug_info["steps"].append(f"Exception: {str(e)}")
+    
+    return debug_info
+
+@app.get("/debug/market/{symbol}")
+async def debug_market_data(symbol: str):
+    """Test our actual get_market_data function"""
+    import os
+    
+    debug_info = {
+        "symbol": symbol,
+        "env_check": {
+            "POLYGON_API_KEY_env": os.getenv("POLYGON_API_KEY", "NOT_FOUND"),
+            "POLYGON_API_KEY_global": POLYGON_API_KEY,
+            "keys_match": os.getenv("POLYGON_API_KEY", "NOT_FOUND") == POLYGON_API_KEY
+        }
+    }
+    
+    try:
+        # Call our actual function
+        result = await get_market_data(symbol)
+        debug_info["market_data_result"] = result
+        debug_info["success"] = True
+    except Exception as e:
+        debug_info["error"] = str(e)
+        debug_info["success"] = False
+    
+    return debug_info
+
 @app.get("/debug/test/{symbol}")
 async def debug_test(symbol: str):
-    """Test Polygon.io API directly with detailed response"""
-    if POLYGON_API_KEY == "demo_key":
-        return {"error": "No Polygon API key configured"}
     
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
