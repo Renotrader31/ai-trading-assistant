@@ -17,9 +17,12 @@ app = FastAPI(title="AI Trading Assistant", description="Beautiful Polygon.io + 
 POLYGON_API_KEY = os.getenv("POLYGON_API_KEY", "demo_key")
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "demo_key")
 
-# Cache for market data to reduce API calls
+# Cache for market data to reduce API calls  
 market_data_cache = {}
 CACHE_DURATION = 5  # seconds - short cache for immediate updates but still functional
+
+# Force Railway cache clear - increment this number to force fresh deployment
+DEPLOYMENT_VERSION = 1
 
 # WebSocket connection manager
 class ConnectionManager:
@@ -1999,7 +2002,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "polygon_configured": POLYGON_API_KEY != "demo_key",
         "anthropic_configured": ANTHROPIC_API_KEY != "demo_key",
-        "version": "emergency-fix-v2",
+        "version": "emergency-fix-v3-force-rebuild",
         "cache_duration": CACHE_DURATION,
         "amd_price_test": (await get_market_data("AMD")).get("price", "error")
     }
