@@ -1995,14 +1995,18 @@ async def websocket_endpoint(websocket: WebSocket):
 
 @app.get("/health")
 async def health_check():
+    amd_data = await get_market_data("AMD")
     return {
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
         "polygon_configured": POLYGON_API_KEY != "demo_key",
         "anthropic_configured": ANTHROPIC_API_KEY != "demo_key",
-        "version": "exact-prices-v4",
+        "version": "live-data-ready-v5",
         "cache_duration": CACHE_DURATION,
-        "amd_price_test": (await get_market_data("AMD")).get("price", "error")
+        "data_source": "LIVE_POLYGON_API" if POLYGON_API_KEY != "demo_key" else "DEMO_DATA",
+        "amd_price_test": amd_data.get("price", "error"),
+        "amd_is_live": amd_data.get("live_data", False),
+        "polygon_key_prefix": f"{POLYGON_API_KEY[:8]}..." if POLYGON_API_KEY != "demo_key" else "demo_key"
     }
 
 # For production deployment
