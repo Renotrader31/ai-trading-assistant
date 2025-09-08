@@ -154,9 +154,35 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
         import hashlib
         seed = int(hashlib.md5(symbol.encode()).hexdigest()[:8], 16)
         
-        # Create more varied price ranges  
-        base_prices = [2.50, 8.75, 25.40, 67.20, 156.80, 245.60, 389.50]  # Mix of penny, small, mid, large cap
-        price = base_prices[seed % len(base_prices)] + (seed % 100) * 0.1
+        # 🚀 REALISTIC PRICE MAPPING for major stocks + random prices for others
+        realistic_prices = {
+            'AAPL': 175.50,    # Apple realistic price
+            'TSLA': 245.80,    # Tesla realistic price  
+            'GOOGL': 142.30,   # Google realistic price
+            'AMZN': 155.90,    # Amazon realistic price
+            'MSFT': 378.85,    # Microsoft realistic price
+            'NVDA': 465.20,    # Nvidia realistic price
+            'META': 338.40,    # Meta realistic price
+            'NFLX': 447.15,    # Netflix realistic price
+            'AMD': 138.95,     # AMD realistic price
+            'INTC': 23.45,     # Intel realistic price
+            'UBER': 68.50,     # Uber realistic price
+            'PYPL': 69.14,     # PayPal realistic price
+            'ADBE': 351.87,    # Adobe realistic price
+            'CRM': 267.30,     # Salesforce realistic price
+            'ORCL': 129.85,    # Oracle realistic price
+        }
+        
+        # Use realistic price if available, otherwise generate varied prices
+        if symbol in realistic_prices:
+            base_price = realistic_prices[symbol]
+            # Add small realistic variation (-2% to +3%)
+            variation = ((seed % 500) / 100) - 2  # -2% to +3%
+            price = base_price * (1 + variation / 100)
+        else:
+            # For unknown stocks, use varied price ranges
+            base_prices = [2.50, 8.75, 25.40, 67.20, 156.80, 245.60, 389.50]
+            price = base_prices[seed % len(base_prices)] + (seed % 100) * 0.1
         
         # Create realistic change percentages (-10% to +15%)
         change_percent = ((seed % 2500) / 100) - 10  # Range: -10.00% to +15.00%
