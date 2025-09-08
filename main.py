@@ -1633,6 +1633,33 @@ async def debug_market_data(symbol: str):
     except Exception as e:
         return {"error": str(e), "symbol": symbol}
 
+@app.get("/debug/polygon-test/{symbol}")
+async def test_polygon_directly(symbol: str):
+    """Test Polygon API directly with the Railway environment key"""
+    try:
+        railway_key = os.getenv("POLYGON_API_KEY", "not_found")
+        if railway_key == "demo_key" or railway_key == "not_found":
+            return {
+                "error": "No Polygon API key in Railway environment",
+                "railway_key_status": "missing",
+                "key_preview": railway_key
+            }
+        
+        # Test the exact same call as our main function
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={railway_key}"
+            response = await client.get(url)
+            
+            return {
+                "symbol": symbol,
+                "api_key_preview": f"{railway_key[:8]}..." if len(railway_key) > 8 else "short_key",
+                "status_code": response.status_code,
+                "working": response.status_code == 200,
+                "response": response.json() if response.status_code == 200 else response.text[:200]
+            }
+    except Exception as e:
+        return {"error": str(e)}
+
 @app.get("/debug/api-status")
 async def debug_api_status():
     """Debug endpoint to check API key configuration and connectivity"""
@@ -2057,7 +2084,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "polygon_configured": POLYGON_API_KEY != "demo_key",
         "anthropic_configured": ANTHROPIC_API_KEY != "demo_key",
-        "version": "smart-fallback-v6",
+        "version": "debug-polygon-v7",
         "cache_duration": CACHE_DURATION,
         "data_source": "LIVE_POLYGON_API" if POLYGON_API_KEY != "demo_key" else "DEMO_DATA",
         "amd_price_test": amd_data.get("price", "error"),
