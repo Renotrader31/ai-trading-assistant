@@ -1157,6 +1157,8 @@ async def get_root():
                                     <option value="50" selected>50 Results</option>
                                     <option value="100">100 Results</option>
                                     <option value="200">200 Results</option>
+                                    <option value="500">500 Results</option>
+                                    <option value="1000">1000 Results</option>
                                 </select>
                             </div>
                         </div>
@@ -1816,20 +1818,24 @@ async def scanner_stocks(
         
         # 🚀 USE FULL STOCK UNIVERSE - This is the key fix!
         if scan_type == "ALL":
-            # For ALL scan, use popular stocks + random sample from full universe
-            popular = STOCK_UNIVERSE.get('popular_stocks', [])[:30]
+            # For ALL scan, use popular stocks + larger random sample
+            popular = STOCK_UNIVERSE.get('popular_stocks', [])[:50]
             all_stocks = STOCK_UNIVERSE.get('all_stocks', [])
             if len(all_stocks) > 100:
-                random_sample = random.sample(all_stocks, min(limit * 2, len(all_stocks)))
+                # Increase sample size: scan up to 5x the limit for better coverage
+                sample_size = min(limit * 5, len(all_stocks), 1000)  # Max 1000 for performance
+                random_sample = random.sample(all_stocks, sample_size)
             else:
                 random_sample = all_stocks
             symbols_to_scan = list(set(popular + random_sample))[:limit]
         else:
-            # For specific scans, use popular + some random stocks for better variety
-            popular = STOCK_UNIVERSE.get('popular_stocks', [])[:30]
+            # For specific scans, use more stocks for better results
+            popular = STOCK_UNIVERSE.get('popular_stocks', [])[:50]
             all_stocks = STOCK_UNIVERSE.get('all_stocks', [])
             if len(all_stocks) > 50:
-                random_sample = random.sample(all_stocks, min(30, len(all_stocks)))
+                # Scan 3x the limit for better filtering
+                sample_size = min(limit * 3, len(all_stocks), 500)  # Max 500 for performance
+                random_sample = random.sample(all_stocks, sample_size)
                 symbols_to_scan = list(set(popular + random_sample))[:limit]
             else:
                 symbols_to_scan = popular[:limit]
@@ -2110,7 +2116,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "polygon_configured": POLYGON_API_KEY != "demo_key",
         "anthropic_configured": ANTHROPIC_API_KEY != "demo_key",
-        "version": "current-price-v9",
+        "version": "expanded-scanning-v10",
         "cache_duration": CACHE_DURATION,
         "data_source": "LIVE_POLYGON_API" if POLYGON_API_KEY != "demo_key" else "DEMO_DATA",
         "amd_price_test": amd_data.get("price", "error"),
