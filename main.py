@@ -1424,6 +1424,40 @@ async def get_root():
 </body>
 </html>"""
 
+@app.get("/debug/env")
+async def debug_env():
+    """Debug endpoint to check environment variables in Railway"""
+    import os
+    
+    env_info = {}
+    
+    # Check for API keys
+    polygon_key = os.environ.get('POLYGON_API_KEY', 'NOT_SET')
+    anthropic_key = os.environ.get('ANTHROPIC_API_KEY', 'NOT_SET')
+    
+    env_info['polygon_api_key'] = {
+        'status': 'SET' if polygon_key != 'NOT_SET' and polygon_key != 'demo_key' else 'NOT_SET',
+        'length': len(polygon_key) if polygon_key != 'NOT_SET' else 0,
+        'preview': polygon_key[:8] + '...' if len(polygon_key) > 8 else polygon_key
+    }
+    
+    env_info['anthropic_api_key'] = {
+        'status': 'SET' if anthropic_key != 'NOT_SET' and anthropic_key != 'demo_key' else 'NOT_SET',
+        'length': len(anthropic_key) if anthropic_key != 'NOT_SET' else 0,
+        'preview': anthropic_key[:8] + '...' if len(anthropic_key) > 8 else anthropic_key
+    }
+    
+    # Check all env vars containing 'API' or 'POLYGON' 
+    env_info['all_api_vars'] = {}
+    for key, value in os.environ.items():
+        if 'API' in key.upper() or 'POLYGON' in key.upper():
+            env_info['all_api_vars'][key] = {
+                'length': len(value),
+                'preview': value[:8] + '...' if len(value) > 8 else value
+            }
+    
+    return env_info
+
 @app.get("/debug/test/{symbol}")
 async def debug_test(symbol: str):
     """Test Polygon.io API directly with detailed response"""
