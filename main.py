@@ -1878,9 +1878,9 @@ async def fetch_stock_data_safely(symbol: str):
 # Scanner API endpoints
 @app.get("/api/scanner/stocks")
 async def scanner_stocks(
-    min_price: float = 10.0,
+    min_price: float = 1.0,     # Lowered from 10.0 to 1.0 - much more inclusive
     max_price: float = 1000.0,
-    min_volume: int = 1000000,
+    min_volume: int = 100000,   # Lowered from 1M to 100K - much more inclusive
     scan_type: str = "ALL",
     sector: str = "ALL",
     limit: int = 50
