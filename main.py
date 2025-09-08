@@ -151,7 +151,7 @@ SCANNER_TYPES = {
 }
 
 async def get_market_data(symbol: str) -> Dict[str, Any]:
-    """REAL-TIME market data for AI chat - Uses current prices, not previous day"""
+    """Market data using previous close - works with basic Polygon plans"""
     
     # If no API key, return simple demo data
     if POLYGON_API_KEY == "demo_key":
@@ -169,46 +169,65 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
         }
     
     try:
-        async with httpx.AsyncClient(timeout=15.0) as client:  # Increased timeout
-            print(f"🔍 Fetching REAL-TIME data for {symbol}")
-            print(f"🔑 API Key status: {'SET' if POLYGON_API_KEY != 'demo_key' else 'DEMO_MODE'} (length: {len(POLYGON_API_KEY)})")
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            print(f"📊 Fetching market data for {symbol}")
+            print(f"🔑 API Key configured: {len(POLYGON_API_KEY)} chars")
             
-            # 🚀 GET CURRENT/LIVE PRICE (not previous day)
-            current_url = f"https://api.polygon.io/v2/last/trade/{symbol}?apikey={POLYGON_API_KEY}"
-            print(f"📡 Requesting: {current_url.replace(POLYGON_API_KEY, '***')}")
-            
-            current_response = await client.get(current_url)
-            print(f"📡 Current price response: {current_response.status_code}")
-            
-            # Debug response content
-            if current_response.status_code != 200:
-                print(f"❌ Current price API error: {current_response.status_code} - {current_response.text[:200]}")
-            
-            # Get previous close for change calculation
+            # Use previous close endpoint - works with basic Polygon plans
             prev_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={POLYGON_API_KEY}"
+            print(f"📡 Requesting previous close: {prev_url.replace(POLYGON_API_KEY, '***')}")
+            
             prev_response = await client.get(prev_url)
             print(f"📡 Previous close response: {prev_response.status_code}")
             
-            current_price = None
-            previous_close = None
-            volume = None
-            
-            # Parse CURRENT/LIVE price with enhanced error checking
-            if current_response.status_code == 200:
+            if prev_response.status_code == 200:
                 try:
-                    current_data = current_response.json()
-                    print(f"📊 Current data structure: {list(current_data.keys())}")
+                    prev_data = prev_response.json()
+                    print(f"📊 Previous close data structure: {list(prev_data.keys())}")
                     
-                    if current_data.get('results'):
-                        current_price = current_data['results'].get('p')  # LIVE CURRENT PRICE
-                        trade_timestamp = current_data['results'].get('t', 0)
-                        print(f"🚀 LIVE CURRENT PRICE: ${current_price} (timestamp: {trade_timestamp})")
+                    if prev_data.get('results') and len(prev_data['results']) > 0:
+                        result = prev_data['results'][0]
+                        
+                        # Extract all the data from previous day
+                        close_price = result.get('c')      # Close price
+                        open_price = result.get('o')       # Open price  
+                        high_price = result.get('h')       # High price
+                        low_price = result.get('l')        # Low price
+                        volume = result.get('v', 0)        # Volume
+                        
+                        # Calculate daily change (close vs open)
+                        if open_price and close_price:
+                            change = close_price - open_price
+                            change_percent = (change / open_price * 100)
+                        else:
+                            change = 0
+                            change_percent = 0
+                        
+                        print(f"✅ SUCCESS: {symbol} ${close_price:.2f} ({change_percent:+.2f}%) Volume: {volume:,}")
+                        
+                        return {
+                            "symbol": symbol,
+                            "company_name": f"{symbol} Inc.",
+                            "price": round(close_price, 2),
+                            "change": round(change, 2),
+                            "change_percent": round(change_percent, 2),
+                            "previous_close": round(open_price, 2) if open_price else round(close_price, 2),
+                            "high": round(high_price, 2) if high_price else None,
+                            "low": round(low_price, 2) if low_price else None,
+                            "volume": volume,
+                            "market_cap": "N/A",
+                            "live_data": True,  # Previous close is still "live" market data
+                            "data_source": "polygon_previous_close",
+                            "timestamp": datetime.now().isoformat(),
+                            "note": "Using previous day's close price - compatible with basic Polygon plans"
+                        }
                     else:
-                        print(f"⚠️ No results in current price response: {current_data}")
+                        print(f"⚠️ No results in previous close response: {prev_data}")
+                        
                 except Exception as parse_error:
-                    print(f"❌ Error parsing current price JSON: {parse_error}")
+                    print(f"❌ Error parsing previous close JSON: {parse_error}")
                     
-            elif current_response.status_code == 401:
+            elif prev_response.status_code == 401:
                 print(f"❌ UNAUTHORIZED: Invalid Polygon API key")
                 return {
                     "symbol": symbol,
@@ -223,86 +242,12 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
                     "data_source": "unauthorized_error",
                     "error": "Invalid API key"
                 }
-            elif current_response.status_code == 403:
-                print(f"❌ FORBIDDEN: API key lacks real-time data permissions")
-                return {
-                    "symbol": symbol,
-                    "company_name": f"{symbol} Inc.",
-                    "price": 150.00,
-                    "change": 2.50,
-                    "change_percent": 1.69,
-                    "previous_close": 147.50,
-                    "volume": 1500000,
-                    "market_cap": "N/A",
-                    "live_data": False,
-                    "data_source": "permission_error", 
-                    "error": "API key lacks real-time permissions"
-                }
+            else:
+                print(f"❌ API Error {prev_response.status_code}: {prev_response.text[:200]}")
             
-            # Parse previous close for change calculation
-            if prev_response.status_code == 200:
-                try:
-                    prev_data = prev_response.json()
-                    if prev_data.get('results') and len(prev_data['results']) > 0:
-                        prev_result = prev_data['results'][0]
-                        previous_close = prev_result.get('c')  # Yesterday's close for comparison
-                        volume = prev_result.get('v', 0)
-                        print(f"📅 Previous close: ${previous_close}, Volume: {volume:,}")
-                except Exception as parse_error:
-                    print(f"❌ Error parsing previous close JSON: {parse_error}")
+            print(f"⚠️ API call failed for {symbol}, using fallback data")
             
-            # Use CURRENT price if available, otherwise fall back to previous close
-            if current_price is not None and current_price > 0:
-                price = current_price
-                
-                # Calculate change from previous close to CURRENT price
-                if previous_close and previous_close > 0:
-                    change = price - previous_close
-                    change_percent = (change / previous_close * 100)
-                else:
-                    change = 0
-                    change_percent = 0
-                    previous_close = price
-                
-                print(f"✅ REAL-TIME SUCCESS: {symbol} ${price:.2f} ({change_percent:+.2f}%) vs prev ${previous_close:.2f}")
-                
-                return {
-                    "symbol": symbol,
-                    "company_name": f"{symbol} Inc.",
-                    "price": round(price, 2),
-                    "change": round(change, 2),
-                    "change_percent": round(change_percent, 2),
-                    "previous_close": round(previous_close, 2),
-                    "volume": volume if volume else 0,
-                    "market_cap": "N/A",
-                    "live_data": True,
-                    "data_source": "polygon_real_time",
-                    "timestamp": datetime.now().isoformat(),
-                    "api_success": True
-                }
-            
-            # If we have previous close but no current price, use previous close
-            elif previous_close and previous_close > 0:
-                print(f"📅 Using previous close as fallback: {symbol} ${previous_close:.2f}")
-                
-                return {
-                    "symbol": symbol,
-                    "company_name": f"{symbol} Inc.",
-                    "price": round(previous_close, 2),
-                    "change": 0.0,
-                    "change_percent": 0.0,
-                    "previous_close": round(previous_close, 2),
-                    "volume": volume if volume else 0,
-                    "market_cap": "N/A",
-                    "live_data": True,
-                    "data_source": "polygon_previous_close",
-                    "timestamp": datetime.now().isoformat(),
-                    "note": "Using previous close - real-time endpoint failed"
-                }
-            
-            print(f"⚠️ No valid price data for {symbol}, using fallback")
-            
-        # Enhanced fallback if APIs fail
+        # Enhanced fallback data
         return {
             "symbol": symbol,
             "company_name": f"{symbol} Inc.",
@@ -315,7 +260,7 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             "live_data": False,
             "data_source": "api_fallback",
             "timestamp": datetime.now().isoformat(),
-            "note": "All API calls failed"
+            "note": "All API calls failed - using fallback data"
         }
         
     except Exception as e:
