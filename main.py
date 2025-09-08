@@ -1998,7 +1998,10 @@ async def health_check():
         "status": "healthy", 
         "timestamp": datetime.now().isoformat(),
         "polygon_configured": POLYGON_API_KEY != "demo_key",
-        "anthropic_configured": ANTHROPIC_API_KEY != "demo_key"
+        "anthropic_configured": ANTHROPIC_API_KEY != "demo_key",
+        "version": "emergency-fix-v2",
+        "cache_duration": CACHE_DURATION,
+        "amd_price_test": (await get_market_data("AMD")).get("price", "error")
     }
 
 # For production deployment
