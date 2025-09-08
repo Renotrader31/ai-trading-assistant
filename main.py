@@ -1,3 +1,4 @@
+# Score-based scanner deployed: 2025-09-08 19:24:45
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 import json
@@ -1126,7 +1127,10 @@ async def get_root():
                         'high_volume': '📊 High Volume',
                         'breakouts': '🚀 Breakouts',
                         'momentum': '⚡ Momentum',
-                        'under_10': '💰 Under $10'
+                        'under_10': '💰 Under $10',
+                        'premium': '🎯 Premium Opportunities (Score 80+)',
+                        'elite': '⭐ Elite Opportunities (Score 90+)',
+                        'legendary': '🏆 Legendary Opportunities (Score 95+)'
                     };
                     
                     for (const [key, name] of Object.entries(scannerTypes)) {
@@ -1648,6 +1652,16 @@ async def get_root():
     </script>
 </body>
 </html>"""
+
+@app.get("/test-dropdown")
+async def test_dropdown():
+    """Serve dropdown test page"""
+    try:
+        with open('test_dropdown.html', 'r') as f:
+            content = f.read()
+        return HTMLResponse(content=content)
+    except FileNotFoundError:
+        return {"error": "Test page not found"}
 
 @app.get("/simple-debug")
 async def simple_debug():

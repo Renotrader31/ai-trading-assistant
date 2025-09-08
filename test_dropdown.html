@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Score Scanner Dropdown</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test-container { max-width: 600px; margin: 0 auto; }
+        select { padding: 10px; font-size: 16px; width: 100%; margin: 10px 0; }
+        button { padding: 12px 24px; background: #0066cc; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #0052a3; }
+        .result { margin-top: 20px; padding: 10px; background: #f5f5f5; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎯 Score Scanner Dropdown Test</h1>
+        <p>This page tests if the score-based scanner dropdown options are working properly.</p>
+        
+        <label for="scanType">Scanner Type:</label>
+        <select id="scanType">
+            <option value="">Loading...</option>
+        </select>
+        
+        <button onclick="testSelectedScanner()">Test Selected Scanner</button>
+        
+        <div id="result" class="result" style="display: none;">
+            <h3>Test Result:</h3>
+            <div id="resultContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // Copy the exact scanner types from main.py
+        const scannerTypes = {
+            'top_gainers': '📈 Top Gainers',
+            'top_losers': '📉 Top Losers', 
+            'high_volume': '📊 High Volume',
+            'breakouts': '🚀 Breakouts',
+            'momentum': '⚡ Momentum',
+            'under_10': '💰 Under $10',
+            'premium': '🎯 Premium Opportunities (Score 80+)',
+            'elite': '⭐ Elite Opportunities (Score 90+)',
+            'legendary': '🏆 Legendary Opportunities (Score 95+)'
+        };
+
+        const scannerEndpoints = {
+            'top_gainers': '/api/scanner/fmp/gainers',
+            'top_losers': '/api/scanner/fmp/losers',
+            'high_volume': '/api/scanner/fmp/volume',
+            'breakouts': '/api/scanner/fmp/breakouts',
+            'momentum': '/api/scanner/fmp/scan',
+            'under_10': '/api/scanner/fmp/scan',
+            'premium': '/api/scanner/fmp/premium',
+            'elite': '/api/scanner/fmp/elite',
+            'legendary': '/api/scanner/fmp/legendary'
+        };
+
+        // Load dropdown options
+        function loadScannerTypes() {
+            const scanTypeSelect = document.getElementById('scanType');
+            scanTypeSelect.innerHTML = '';
+            
+            for (const [key, name] of Object.entries(scannerTypes)) {
+                const option = document.createElement('option');
+                option.value = key;
+                option.textContent = name;
+                scanTypeSelect.appendChild(option);
+            }
+            
+            console.log('✅ Scanner types loaded:', Object.keys(scannerTypes).length, 'options');
+        }
+
+        // Test the selected scanner
+        async function testSelectedScanner() {
+            const scanType = document.getElementById('scanType').value;
+            const resultDiv = document.getElementById('result');
+            const resultContent = document.getElementById('resultContent');
+            
+            if (!scanType) {
+                alert('Please select a scanner type');
+                return;
+            }
+            
+            resultDiv.style.display = 'block';
+            resultContent.innerHTML = '<div>🔄 Testing scanner: ' + scannerTypes[scanType] + '</div>';
+            
+            const endpoint = scannerEndpoints[scanType];
+            if (endpoint) {
+                resultContent.innerHTML += '<div>✅ Endpoint found: ' + endpoint + '</div>';
+                resultContent.innerHTML += '<div>🚀 This scanner should work in your main app!</div>';
+                
+                // Try to test the actual endpoint
+                try {
+                    const response = await fetch(endpoint + '?limit=3');
+                    if (response.ok) {
+                        const data = await response.json();
+                        resultContent.innerHTML += '<div>✅ API Response: SUCCESS</div>';
+                        resultContent.innerHTML += '<div>📊 Found ' + (data.stocks?.length || 0) + ' stocks</div>';
+                    } else {
+                        resultContent.innerHTML += '<div>⚠️ API Response: ' + response.status + '</div>';
+                    }
+                } catch (error) {
+                    resultContent.innerHTML += '<div>⚠️ API Test Error: ' + error.message + '</div>';
+                }
+            } else {
+                resultContent.innerHTML += '<div>❌ No endpoint found for: ' + scanType + '</div>';
+            }
+        }
+
+        // Load dropdown on page load
+        window.addEventListener('load', loadScannerTypes);
+    </script>
+</body>
+</html>
