@@ -2062,6 +2062,47 @@ async def get_fmp_active_stocks() -> list:
         print(f"Error fetching active stocks: {e}")
         return ['AAPL', 'MSFT', 'GOOGL', 'AMZN', 'TSLA', 'NVDA', 'META', 'NFLX']
 
+@app.get("/debug/scanner-data/{limit}")
+async def debug_scanner_data(limit: int = 10):
+    """Debug endpoint to see raw scanner data before filtering"""
+    try:
+        # Get some active stocks
+        active_stocks = await get_fmp_active_stocks()
+        test_stocks = active_stocks[:limit]
+        
+        print(f"🔍 Testing {len(test_stocks)} stocks: {test_stocks}")
+        
+        # Fetch their data
+        results = []
+        for symbol in test_stocks:
+            stock_data = await fetch_fmp_stock_data(symbol)
+            if not stock_data.get("error"):
+                results.append({
+                    "symbol": stock_data.get("symbol"),
+                    "price": stock_data.get("price"),
+                    "change_percent": stock_data.get("change_percent"),
+                    "volume": stock_data.get("volume"),
+                    "meets_gainers": stock_data.get("change_percent", 0) >= 0.5,
+                    "meets_losers": stock_data.get("change_percent", 0) <= -0.5,
+                    "meets_volume": stock_data.get("volume", 0) >= 500000
+                })
+        
+        return {
+            "debug": "raw_scanner_data",
+            "tested_stocks": test_stocks,
+            "results": results,
+            "summary": {
+                "total_tested": len(results),
+                "gainers_0_5": len([r for r in results if r.get("meets_gainers")]),
+                "losers_0_5": len([r for r in results if r.get("meets_losers")]),
+                "high_volume": len([r for r in results if r.get("meets_volume")])
+            }
+        }
+        
+    except Exception as e:
+        return {"debug": "error", "error": str(e)}
+
+
 @app.get("/test-scanner-simple")
 async def test_scanner_simple():
     """Simple test to verify scanner functionality"""
@@ -2168,18 +2209,18 @@ async def fmp_scanner_scan(
                 if volume < min_volume:
                     continue
                 
-                # Scanner type filters
-                if scan_type == "top_gainers" and change_percent < 2.0:
+                                # Scanner type filters - ADJUSTED FOR REAL MARKET CONDITIONS
+                if scan_type == "top_gainers" and change_percent < 0.5:  # Lowered from 2.0% to 0.5%
                     continue
-                elif scan_type == "top_losers" and change_percent > -2.0:
+                elif scan_type == "top_losers" and change_percent > -0.5:  # Lowered from -2.0% to -0.5%
                     continue
-                elif scan_type == "high_volume" and volume < min_volume * 1.5:
+                elif scan_type == "high_volume" and volume < min_volume * 0.8:  # Lowered from 1.5x to 0.8x
                     continue
-                elif scan_type == "breakouts" and change_percent < 3.0:
+                elif scan_type == "breakouts" and change_percent < 1.5:  # Lowered from 3.0% to 1.5%
                     continue
                 elif scan_type == "under_10" and price >= 10.0:
                     continue
-                elif scan_type == "momentum" and (change_percent < 1.0 or volume < min_volume):
+                elif scan_type == "momentum" and (change_percent < 0.3 or volume < min_volume * 0.5):  # Much more lenient
                     continue
                 
                 # Calculate scanner score safely
@@ -2251,10 +2292,22 @@ async def fmp_scanner_scan(
         }
 @app.get("/api/scanner/fmp/gainers")
 async def fmp_top_gainers(limit: int = 20):
-    """Get top gainers using FMP real-time data"""
-    return await fmp_scanner_scan("top_gainers", min_price=5.0, limit=limit)
+    """Get top gainers using FMP real-time data - REALISTIC FILTERS"""
+    return await fmp_scanner_scan("top_gainers", min_price=1.0, limit=limit)  # Lowered min price
 
 @app.get("/api/scanner/fmp/losers") 
+async def fmp_top_losers(limit: int = 20):
+    """Get top losers using FMP real-time data - REALISTIC FILTERS"""
+    return await fmp_scanner_scan("top_losers", min_price=1.0, limit=limit)  # Lowered min price
+
+@app.get("/api/scanner/fmp/volume")
+async def fmp_high_volume(limit: int = 20):
+    """Get high volume stocks using FMP real-time data - REALISTIC FILTERS"""
+    return await fmp_scanner_scan("high_volume", min_volume=500000, limit=limit)  # Lowered volume req
+
+@app.get("/api/scanner/fmp/breakouts")
+async def fmp_breakouts(limit: int = 20):
+    """Get breakout stocks using FMP real-time data - REALISTIC FILTERS"""/losers") 
 async def fmp_top_losers(limit: int = 20):
     """Get top losers using FMP real-time data"""
     return await fmp_scanner_scan("top_losers", min_price=5.0, limit=limit)
