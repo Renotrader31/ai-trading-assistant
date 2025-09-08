@@ -236,9 +236,15 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
         async with httpx.AsyncClient(timeout=5.0) as client:
             print(f"DEBUG: Fetching data for {symbol} with Polygon API")
             
-            # Get previous close (most reliable endpoint)
+            # Get current/last trade price (real-time data)
+            last_trade_url = f"https://api.polygon.io/v2/last/trade/{symbol}?apikey={POLYGON_API_KEY}"
+            print(f"DEBUG: Calling last trade: {last_trade_url}")
+            last_trade_response = await client.get(last_trade_url)
+            print(f"DEBUG: Last trade response: {last_trade_response.status_code}")
+            
+            # Also get previous close for change calculation
             prev_close_url = f"https://api.polygon.io/v2/aggs/ticker/{symbol}/prev?adjusted=true&apikey={POLYGON_API_KEY}"
-            print(f"DEBUG: Calling {prev_close_url}")
+            print(f"DEBUG: Calling prev close: {prev_close_url}")
             prev_close_response = await client.get(prev_close_url)
             print(f"DEBUG: Previous close response: {prev_close_response.status_code}")
             
@@ -249,9 +255,19 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             print(f"DEBUG: Details response: {details_response.status_code}")
             
             # Parse the responses
+            last_trade_data = {}
             prev_close_data = {}
             details_data = {}
             
+            # Parse last trade (current price)
+            if last_trade_response.status_code == 200:
+                last_trade_data = last_trade_response.json()
+                print(f"DEBUG: Last trade data: {last_trade_data}")
+            else:
+                error_text = last_trade_response.text
+                print(f"DEBUG: Last trade error: {last_trade_response.status_code} - {error_text}")
+            
+            # Parse previous close  
             if prev_close_response.status_code == 200:
                 prev_close_data = prev_close_response.json()
                 print(f"DEBUG: Prev close data: {prev_close_data}")
@@ -259,6 +275,7 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
                 error_text = prev_close_response.text
                 print(f"DEBUG: Prev close error: {prev_close_response.status_code} - {error_text}")
             
+            # Parse company details
             if details_response.status_code == 200:
                 details_data = details_response.json()
                 print(f"DEBUG: Details data keys: {list(details_data.keys()) if details_data else 'None'}")
@@ -271,17 +288,23 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
             prev_close_price = None
             volume = None
             
-            # Get previous close price (most reliable data)  
+            # Get current price from last trade
+            if last_trade_data.get('results'):
+                current_price = last_trade_data['results'].get('p')  # price from last trade
+                print(f"DEBUG: Current price from last trade: ${current_price}")
+            
+            # Get previous close price for change calculation
             if prev_close_data.get('results') and len(prev_close_data['results']) > 0:
                 result = prev_close_data['results'][0]
-                prev_close_price = result.get('c')  # close price from previous day
+                prev_close_price = result.get('c')  # previous day's close
+                volume = result.get('v')            # previous day's volume
                 
-                # 🚀 USE REAL CLOSE PRICE as current price for real-time data
-                current_price = prev_close_price  # Use actual close price
-                volume = result.get('v')          # actual volume
+                print(f"DEBUG: Previous close: ${prev_close_price}, Volume: {volume:,}")
                 
-                print(f"DEBUG: Using REAL Polygon data - Price: ${current_price:.2f}, Volume: {volume:,}")
-                print(f"DEBUG: Full result data: {result}")
+            # If no current price, fall back to previous close
+            if current_price is None and prev_close_price is not None:
+                current_price = prev_close_price
+                print(f"DEBUG: Using prev close as current price: ${current_price}")
             
             # Get company details
             company_name = symbol
@@ -342,22 +365,15 @@ async def get_market_data(symbol: str) -> Dict[str, Any]:
                     "data_note": f"Fallback data - API returned {prev_close_response.status_code} error"
                 }
             
-            # Calculate change and simulate realistic intraday movement for scanner
-            if current_price == prev_close_price:
-                # For scanner functionality, simulate realistic intraday movement
-                import hashlib
-                seed = int(hashlib.md5(symbol.encode()).hexdigest()[:8], 16)
-                intraday_change_percent = ((seed % 1000) / 100) - 5  # -5% to +5%
-                simulated_current = prev_close_price * (1 + intraday_change_percent / 100)
-                
-                change = simulated_current - prev_close_price
-                change_percent = intraday_change_percent
-                current_price = simulated_current
-                
-                print(f"DEBUG: Simulated intraday movement: {intraday_change_percent:+.2f}% (${prev_close_price:.2f} → ${current_price:.2f})")
-            else:
+            # Calculate real change between current price and previous close
+            if current_price is not None and prev_close_price is not None:
                 change = current_price - prev_close_price
                 change_percent = (change / prev_close_price * 100) if prev_close_price > 0 else 0
+                print(f"DEBUG: Real price change: ${prev_close_price:.2f} → ${current_price:.2f} ({change_percent:+.2f}%)")
+            else:
+                change = 0
+                change_percent = 0
+                print(f"DEBUG: Could not calculate change - current: {current_price}, prev: {prev_close_price}")
             
             # Format market data for AI analysis
             formatted_data = {
@@ -2094,7 +2110,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "polygon_configured": POLYGON_API_KEY != "demo_key",
         "anthropic_configured": ANTHROPIC_API_KEY != "demo_key",
-        "version": "real-polygon-data-v8",
+        "version": "current-price-v9",
         "cache_duration": CACHE_DURATION,
         "data_source": "LIVE_POLYGON_API" if POLYGON_API_KEY != "demo_key" else "DEMO_DATA",
         "amd_price_test": amd_data.get("price", "error"),
